@@ -8,7 +8,6 @@
 
 using namespace duckdb; // NOLINT
 
-
 TEST_CASE("FutureWrapper move semantics", "[future_utils]") {
 	auto token = make_shared_ptr<Token>();
 	FutureWrapper<int> fw1(std::function<int()>([]() { return 99; }), token);
@@ -55,9 +54,10 @@ TEST_CASE("FutureWrapper<void> exception propagation", "[future_utils]") {
 TEST_CASE("FutureWrapper<int> IsReady", "[future_utils]") {
 	auto token = make_shared_ptr<Token>();
 	FutureWrapper<int> fw(std::function<int()>([]() {
-		std::this_thread::sleep_for(std::chrono::milliseconds(200));
-		return 10;
-	}), token);
+		                      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		                      return 10;
+	                      }),
+	                      token);
 	fw.Wait();
 	REQUIRE(fw.IsReady());
 }
@@ -68,9 +68,10 @@ TEST_CASE("WaitForAny", "[future_utils]") {
 	vector<FutureWrapper<int>> futs;
 	futs.emplace_back(std::function<int()>([]() { return 1; }), token);
 	futs.emplace_back(std::function<int()>([]() {
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
-		return 2;
-	}), token);
+		                  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		                  return 2;
+	                  }),
+	                  token);
 
 	auto wait_result = WaitForAny(std::move(futs), token);
 	REQUIRE(wait_result.pending_futures.size() == 1);
