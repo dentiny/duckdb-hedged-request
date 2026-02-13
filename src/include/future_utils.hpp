@@ -258,4 +258,3 @@ vector<FutureWrapper<T>> WaitForAny(vector<FutureWrapper<T>> &futs, shared_ptr<T
 }
 
 } // namespace duckdb
-
