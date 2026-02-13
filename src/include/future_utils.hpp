@@ -48,8 +48,7 @@ public:
 	FutureWrapper(const FutureWrapper &) = delete;
 	FutureWrapper &operator=(const FutureWrapper &) = delete;
 
-	FutureWrapper(FutureWrapper &&other) noexcept
-	    : token(std::move(other.token)), future(std::move(other.future)) {
+	FutureWrapper(FutureWrapper &&other) noexcept : token(std::move(other.token)), future(std::move(other.future)) {
 	}
 
 	FutureWrapper &operator=(FutureWrapper &&other) noexcept {
@@ -114,8 +113,7 @@ public:
 	FutureWrapper(const FutureWrapper &) = delete;
 	FutureWrapper &operator=(const FutureWrapper &) = delete;
 
-	FutureWrapper(FutureWrapper &&other) noexcept
-	    : token(std::move(other.token)), future(std::move(other.future)) {
+	FutureWrapper(FutureWrapper &&other) noexcept : token(std::move(other.token)), future(std::move(other.future)) {
 	}
 
 	FutureWrapper &operator=(FutureWrapper &&other) noexcept {
@@ -181,4 +179,3 @@ WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token)
 }
 
 } // namespace duckdb
-
