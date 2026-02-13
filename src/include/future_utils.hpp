@@ -11,7 +11,7 @@
 
 namespace duckdb {
 
-// Used to signal completion across multiple FutureWrappers.
+// Token used to signal completion across multiple FutureWrappers.
 struct Token {
 	bool completed = false;
 	mutex mu;
@@ -159,8 +159,7 @@ struct WaitResult {
 };
 
 // Wait until any of the futures completes.
-// Returns a WaitResult containing the result of the first completed future
-// and the remaining pending futures.
+// Returns a WaitResult containing the result of the first completed future and pending futures.
 template <typename T>
 WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token) {
 	{
