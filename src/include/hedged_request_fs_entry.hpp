@@ -1,8 +1,8 @@
 #pragma once
 
+#include "future_utils.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/storage/object_cache.hpp"
-#include <future>
 
 namespace duckdb {
 
@@ -20,7 +20,7 @@ public:
 		return "hedged_request_fs_entry";
 	}
 
-	void AddPendingRequest(std::future<void> future);
+	void AddPendingRequest(FutureWrapper<void> future);
 
 private:
 	// Try to clean up completed requests in a non-blocking style.
@@ -30,7 +30,7 @@ private:
 	void WaitAll();
 
 	mutex cache_mutex;
-	vector<std::future<void>> pending_requests;
+	vector<FutureWrapper<void>> pending_requests;
 };
 
 } // namespace duckdb

@@ -6,7 +6,6 @@
 
 namespace duckdb {
 
-// Forward declaration.
 class HedgedFileHandle;
 class HedgedRequestFsEntry;
 
@@ -20,7 +19,7 @@ public:
 	~HedgedFileSystem() override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
-		optional_ptr<FileOpener> opener = nullptr) override;
+	                                optional_ptr<FileOpener> opener = nullptr) override;
 
 	int64_t Read(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
 	void Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
@@ -70,11 +69,26 @@ public:
 	bool OnDiskFile(FileHandle &handle) override;
 
 private:
-	friend class HedgedFileHandle;
-
 	unique_ptr<FileSystem> wrapped_fs;
 	std::chrono::milliseconds timeout;
 	shared_ptr<HedgedRequestFsEntry> cache;
+};
+
+// HedgedFileHandle wraps a file handle and delegates to HedgedFileSystem for hedged reads
+class HedgedFileHandle : public FileHandle {
+public:
+	HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle, const string &path);
+	~HedgedFileHandle() override;
+
+	void Close() override;
+
+	FileHandle &GetWrappedHandle() {
+		return *wrapped_handle;
+	}
+
+private:
+	HedgedFileSystem &hedged_fs;
+	unique_ptr<FileHandle> wrapped_handle;
 };
 
 } // namespace duckdb

@@ -11,27 +11,23 @@ HedgedRequestFsEntry::~HedgedRequestFsEntry() {
 	WaitAll();
 }
 
-void HedgedRequestFsEntry::AddPendingRequest(std::future<void> future) {
+void HedgedRequestFsEntry::AddPendingRequest(FutureWrapper<void> future) {
 	const lock_guard<mutex> lock(cache_mutex);
-	pending_requests.emplace_back(std::move(future));
+	pending_requests.push_back(std::move(future));
 	CleanupCompleted();
 }
 
 void HedgedRequestFsEntry::CleanupCompleted() {
 	pending_requests.erase(
 	    std::remove_if(pending_requests.begin(), pending_requests.end(),
-	                   [](std::future<void> &f) {
-		                   return f.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-	                   }),
+	                   [](FutureWrapper<void> &f) { return f.IsReady(); }),
 	    pending_requests.end());
 }
 
 void HedgedRequestFsEntry::WaitAll() {
 	const lock_guard<mutex> lock(cache_mutex);
 	for (auto &future : pending_requests) {
-		if (future.valid()) {
-			future.wait();
-		}
+		future.Wait();
 	}
 	pending_requests.clear();
 }

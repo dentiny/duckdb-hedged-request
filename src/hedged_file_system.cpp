@@ -1,5 +1,5 @@
 #include "hedged_file_system.hpp"
-#include "hedged_file_handle.hpp"
+#include "future_utils.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/storage/object_cache.hpp"
@@ -27,18 +27,58 @@ HedgedFileSystem::~HedgedFileSystem() {
 
 unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFlags flags,
                                                    optional_ptr<FileOpener> opener) {
-	auto wrapped_handle = wrapped_fs->OpenFile(path, flags, opener);
+	auto token = make_shared_ptr<Token>();
+
+	// Start the primary open
+	auto primary = CreateFuture<unique_ptr<FileHandle>>(
+	    std::function<unique_ptr<FileHandle>()>([&]() { return wrapped_fs->OpenFile(path, flags, opener); }), token);
+
+	// Wait for the primary to complete within timeout
+	{
+		unique_lock<mutex> lock(token->mu);
+		token->cv.wait_for(lock, timeout, [&] { return token->completed; });
+		token->completed = false;
+	}
+
+	if (primary.IsReady()) {
+		auto wrapped_handle = primary.Get();
+		return make_uniq<HedgedFileHandle>(*this, std::move(wrapped_handle), path);
+	}
+
+	// Primary open timed out, start hedged open
+	auto hedged = CreateFuture<unique_ptr<FileHandle>>(
+	    std::function<unique_ptr<FileHandle>()>([&]() { return wrapped_fs->OpenFile(path, flags, opener); }), token);
+
+	// Race: collect both into a vector and wait for any
+	vector<FutureWrapper<unique_ptr<FileHandle>>> futs;
+	futs.push_back(std::move(primary));
+	futs.push_back(std::move(hedged));
+
+	auto unready = WaitForAny(futs, token);
+
+	// futs now contains the ready future(s), unready contains the rest
+	auto wrapped_handle = futs[0].Get();
+
+	// Add unready futures to cache for background cleanup
+	for (auto &fut : unready) {
+		auto void_token = make_shared_ptr<Token>();
+		cache->AddPendingRequest(
+		    CreateFuture<void>(std::function<void()>([f = make_shared_ptr<FutureWrapper<unique_ptr<FileHandle>>>(
+		                                                  std::move(fut))]() { f->Wait(); }),
+		                       void_token));
+	}
+
 	return make_uniq<HedgedFileHandle>(*this, std::move(wrapped_handle), path);
 }
 
 int64_t HedgedFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
-	return hedged_handle.HedgedRead(buffer, nr_bytes);
+	return wrapped_fs->Read(hedged_handle.GetWrappedHandle(), buffer, nr_bytes);
 }
 
 void HedgedFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
-	hedged_handle.HedgedRead(buffer, nr_bytes, location);
+	wrapped_fs->Read(hedged_handle.GetWrappedHandle(), buffer, nr_bytes, location);
 }
 
 void HedgedFileSystem::Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) {
@@ -139,8 +179,8 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 	return wrapped_fs->Glob(path, opener);
 }
 
-std::string HedgedFileSystem::GetName() const {
-	return "HedgedFileSystem(" + wrapped_fs->GetName() + ")";
+string HedgedFileSystem::GetName() const {
+	return StringUtil::Format("HedgedFileSystem(%s)", wrapped_fs->GetName());
 }
 
 void HedgedFileSystem::RegisterSubSystem(unique_ptr<FileSystem> sub_fs) {
@@ -189,6 +229,23 @@ bool HedgedFileSystem::CanSeek() {
 bool HedgedFileSystem::OnDiskFile(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	return wrapped_fs->OnDiskFile(hedged_handle.GetWrappedHandle());
+}
+
+//===--------------------------------------------------------------------===//
+// HedgedFileHandle
+//===--------------------------------------------------------------------===//
+
+HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle, const string &path)
+    : FileHandle(fs, path, wrapped_handle->GetFlags()), hedged_fs(fs), wrapped_handle(std::move(wrapped_handle)) {
+}
+
+HedgedFileHandle::~HedgedFileHandle() {
+}
+
+void HedgedFileHandle::Close() {
+	if (wrapped_handle) {
+		wrapped_handle->Close();
+	}
 }
 
 } // namespace duckdb
