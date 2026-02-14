@@ -3,6 +3,7 @@
 #include "duckdb/common/local_file_system.hpp"
 #include "duckdb/common/mutex.hpp"
 
+#include <atomic>
 #include <chrono>
 
 namespace duckdb {
@@ -71,15 +72,14 @@ private:
 
 	mutex delay_mutex;
 	std::chrono::milliseconds delay;
-	mutable mutex count_mutex;
-	mutable idx_t open_file_count;
-	mutable idx_t file_exists_count;
-	mutable idx_t directory_exists_count;
-	mutable idx_t list_files_count;
-	mutable idx_t glob_count;
-	mutable idx_t get_file_size_count;
-	mutable idx_t get_last_modified_time_count;
-	mutable idx_t get_file_type_count;
+	std::atomic<idx_t> open_file_count;
+	std::atomic<idx_t> file_exists_count;
+	std::atomic<idx_t> directory_exists_count;
+	std::atomic<idx_t> list_files_count;
+	std::atomic<idx_t> glob_count;
+	std::atomic<idx_t> get_file_size_count;
+	std::atomic<idx_t> get_last_modified_time_count;
+	std::atomic<idx_t> get_file_type_count;
 };
 
 } // namespace duckdb
