@@ -1,5 +1,6 @@
 #include "hedged_request_fs_entry.hpp"
 
+#include "duckdb/common/numeric_utils.hpp"
 #include <algorithm>
 
 namespace duckdb {
@@ -41,11 +42,11 @@ HedgedRequestConfig HedgedRequestFsEntry::GetConfig() const {
 void HedgedRequestFsEntry::UpdateConfig(HedgedRequestOperation operation, std::chrono::milliseconds delay_ms) {
 	// Throw exception to aovid segfault.
 	if (operation >= HedgedRequestOperation::COUNT) {
-		throw InvalidInputException("Invalid operation: %d", static_cast<int>(operation));
+		throw InvalidInputException("Invalid operation: %d", NumericCast<int>(operation));
 	}
 
 	const lock_guard<mutex> lock(cache_mutex);
-	config.delays_ms[static_cast<size_t>(operation)] = delay_ms;
+	config.delays_ms[NumericCast<size_t>(operation)] = delay_ms;
 }
 
 void HedgedRequestFsEntry::UpdateMaxHedgedRequestCount(size_t max_count) {
