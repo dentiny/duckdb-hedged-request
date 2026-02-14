@@ -20,7 +20,7 @@ public:
 		return "hedged_request_fs_entry";
 	}
 
-	void AddPendingRequest(FutureWrapper<void> future);
+	void AddPendingRequest(std::function<void()> functor);
 
 private:
 	// Try to clean up completed requests in a non-blocking style.

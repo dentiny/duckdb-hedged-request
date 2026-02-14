@@ -19,4 +19,3 @@ void CreateTestFile(const string &path, const string &content) {
 }
 
 } // namespace duckdb
-

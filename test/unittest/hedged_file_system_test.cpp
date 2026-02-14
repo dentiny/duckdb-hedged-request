@@ -19,7 +19,8 @@
 using namespace duckdb; // NOLINT
 
 namespace {
-constexpr const char *TEST_CONTENT = "Hello, HedgedFileSystem! This is a test file for hedged reads.\nThe quick brown fox jumps over the lazy dog.\n";
+constexpr const char *TEST_CONTENT =
+    "Hello, HedgedFileSystem! This is a test file for hedged reads.\nThe quick brown fox jumps over the lazy dog.\n";
 constexpr const char *FAST_TEST_CONTENT = "Fast test file\n";
 constexpr const char *DB_TEST_CONTENT = "Database test file\n";
 } // namespace
@@ -33,7 +34,7 @@ TEST_CASE("HedgedFileSystem with slow open", "[hedged_file_system]") {
 	mock_fs->ResetOpenFileCount();
 	auto *mock_fs_ptr = mock_fs.get();
 
-	auto entry = make_shared<HedgedRequestFsEntry>();
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
 	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(1000), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
@@ -57,7 +58,7 @@ TEST_CASE("HedgedFileSystem with fast open (no hedging)", "[hedged_file_system]"
 	mock_fs->ResetOpenFileCount();
 	auto *mock_fs_ptr = mock_fs.get();
 
-	auto entry = make_shared<HedgedRequestFsEntry>();
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
 	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(1000), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
@@ -86,7 +87,7 @@ TEST_CASE("HedgedFileSystem with ClientContextFileOpener", "[hedged_file_system]
 	mock_fs->ResetOpenFileCount();
 	auto *mock_fs_ptr = mock_fs.get();
 
-	auto entry = make_shared<HedgedRequestFsEntry>();
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
 	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(1000), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, opener);
