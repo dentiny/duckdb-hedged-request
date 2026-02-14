@@ -30,7 +30,7 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 }
 
 template <typename T>
-T HedgedRequest(const std::function<T()> &fn, std::chrono::milliseconds timeout, shared_ptr<HedgedRequestFsEntry> entry) {
+T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds timeout, shared_ptr<HedgedRequestFsEntry> entry) {
 	auto token = make_shared_ptr<Token>();
 	using FutureType = FutureWrapper<T>;
 
@@ -80,7 +80,6 @@ HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chr
 HedgedFileSystem::~HedgedFileSystem() {
 }
 
-
 int64_t HedgedFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	return wrapped_fs->Read(hedged_handle.GetWrappedHandle(), buffer, nr_bytes);
@@ -106,12 +105,10 @@ bool HedgedFileSystem::Trim(FileHandle &handle, idx_t offset_bytes, idx_t length
 	return wrapped_fs->Trim(hedged_handle.GetWrappedHandle(), offset_bytes, length_bytes);
 }
 
-
 void HedgedFileSystem::Truncate(FileHandle &handle, int64_t new_size) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	wrapped_fs->Truncate(hedged_handle.GetWrappedHandle(), new_size);
 }
-
 
 void HedgedFileSystem::CreateDirectory(const string &directory, optional_ptr<FileOpener> opener) {
 	wrapped_fs->CreateDirectory(directory, opener);
@@ -121,11 +118,9 @@ void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<Fil
 	wrapped_fs->RemoveDirectory(directory, opener);
 }
 
-
 void HedgedFileSystem::MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener) {
 	wrapped_fs->MoveFile(source, target, opener);
 }
-
 
 bool HedgedFileSystem::IsPipe(const string &filename, optional_ptr<FileOpener> opener) {
 	return wrapped_fs->IsPipe(filename, opener);
@@ -155,7 +150,6 @@ string HedgedFileSystem::ExpandPath(const string &path) {
 string HedgedFileSystem::PathSeparator(const string &path) {
 	return wrapped_fs->PathSeparator(path);
 }
-
 
 string HedgedFileSystem::GetName() const {
 	return StringUtil::Format("HedgedFileSystem - %s", wrapped_fs->GetName());
@@ -217,99 +211,103 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
                                                   optional_ptr<FileOpener> opener) {
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
-	auto fn = std::function<unique_ptr<FileHandle>()>(
-	    [fs_ptr, path, flags, opener_copy]() { return fs_ptr->OpenFile(path, flags, opener_copy.get()); });
-	auto result = HedgedRequest<unique_ptr<FileHandle>>(std::move(fn), timeout, entry);
+	auto result = HedgedRequest<unique_ptr<FileHandle>>(
+	    std::function<unique_ptr<FileHandle>()>([fs_ptr, path_copy = path, flags, opener_copy]() {
+		    return fs_ptr->OpenFile(path_copy, flags, opener_copy.get());
+	    }),
+	    timeout, entry);
 	return make_uniq<HedgedFileHandle>(*this, std::move(result), path);
 }
 
 bool HedgedFileSystem::DirectoryExists(const string &directory, optional_ptr<FileOpener> opener) {
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
-	auto fn = std::function<bool()>([fs_ptr, directory, opener_copy]() {
-		return fs_ptr->DirectoryExists(directory, opener_copy.get());
-	});
-	return HedgedRequest<bool>(std::move(fn), timeout, entry);
+	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, directory_copy = directory, opener_copy]() {
+		                           return fs_ptr->DirectoryExists(directory_copy, opener_copy.get());
+	                           }),
+	                           timeout, entry);
 }
 
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
                                  FileOpener *opener) {
-	// ListFiles invokes a callback, and we cannot safely call it multiple times concurrently
-	// So we collect results in a vector and invoke the callback once at the end
 	auto results = make_shared_ptr<vector<std::pair<string, bool>>>();
 	auto results_mutex = make_shared_ptr<mutex>();
-	
+
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
-	auto fn = std::function<bool()>([fs_ptr, directory, results, results_mutex, opener_copy]() {
-		return fs_ptr->ListFiles(directory, [results, results_mutex](const string &name, bool is_dir) {
-			const lock_guard<mutex> lock(*results_mutex);
-			results->emplace_back(name, is_dir);
-		}, opener_copy.get());
-	});
-	
-	bool success = HedgedRequest<bool>(fn, timeout, entry);
-	
-	// Invoke the original callback with collected results
-	for (const auto &result : *results) {
-		callback(result.first, result.second);
+	bool success = HedgedRequest<bool>(
+	    std::function<bool()>([fs_ptr, directory_copy = directory, results, results_mutex, opener_copy]() {
+		    return fs_ptr->ListFiles(
+		        directory_copy,
+		        [results, results_mutex](const string &name, bool is_dir) {
+			        const lock_guard<mutex> lock(*results_mutex);
+			        results->emplace_back(name, is_dir);
+		        },
+		        opener_copy.get());
+	    }),
+	    timeout, entry);
+
+	if (success) {
+		for (auto &result : *results) {
+			callback(result.first, result.second);
+		}
 	}
-	
 	return success;
 }
 
 bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpener> opener) {
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
-	auto fn = std::function<bool()>([fs_ptr, filename, opener_copy]() {
-		return fs_ptr->FileExists(filename, opener_copy.get());
-	});
-	return HedgedRequest<bool>(std::move(fn), timeout, entry);
+	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, filename_copy = filename, opener_copy]() {
+		                           return fs_ptr->FileExists(filename_copy, opener_copy.get());
+	                           }),
+	                           timeout, entry);
 }
 
 vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *opener) {
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
-	auto fn = std::function<vector<OpenFileInfo>()>([fs_ptr, path, opener_copy]() {
-		return fs_ptr->Glob(path, opener_copy.get());
-	});
-	return HedgedRequest<vector<OpenFileInfo>>(std::move(fn), timeout, entry);
+	return HedgedRequest<vector<OpenFileInfo>>(
+	    std::function<vector<OpenFileInfo>()>(
+	        [fs_ptr, path_copy = path, opener_copy]() { return fs_ptr->Glob(path_copy, opener_copy.get()); }),
+	    timeout, entry);
 }
 
 int64_t HedgedFileSystem::GetFileSize(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto fn = std::function<int64_t()>([fs_ptr, &hedged_handle]() {
-		return fs_ptr->GetFileSize(hedged_handle.GetWrappedHandle());
-	});
-	return HedgedRequest<int64_t>(std::move(fn), timeout, entry);
+	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	return HedgedRequest<int64_t>(
+	    std::function<int64_t()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileSize(*wrapped_handle_ptr); }),
+	    timeout, entry);
 }
 
 timestamp_t HedgedFileSystem::GetLastModifiedTime(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto fn = std::function<timestamp_t()>([fs_ptr, &hedged_handle]() {
-		return fs_ptr->GetLastModifiedTime(hedged_handle.GetWrappedHandle());
-	});
-	return HedgedRequest<timestamp_t>(std::move(fn), timeout, entry);
+	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	return HedgedRequest<timestamp_t>(std::function<timestamp_t()>([fs_ptr, wrapped_handle_ptr]() {
+		                                  return fs_ptr->GetLastModifiedTime(*wrapped_handle_ptr);
+	                                  }),
+	                                  timeout, entry);
 }
 
 string HedgedFileSystem::GetVersionTag(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto fn = std::function<string()>([fs_ptr, &hedged_handle]() {
-		return fs_ptr->GetVersionTag(hedged_handle.GetWrappedHandle());
-	});
-	return HedgedRequest<string>(std::move(fn), timeout, entry);
+	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	return HedgedRequest<string>(
+	    std::function<string()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetVersionTag(*wrapped_handle_ptr); }),
+	    timeout, entry);
 }
 
 FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto fn = std::function<FileType()>([fs_ptr, &hedged_handle]() {
-		return fs_ptr->GetFileType(hedged_handle.GetWrappedHandle());
-	});
-	return HedgedRequest<FileType>(std::move(fn), timeout, entry);
+	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	return HedgedRequest<FileType>(
+	    std::function<FileType()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileType(*wrapped_handle_ptr); }),
+	    timeout, entry);
 }
 
 //===--------------------------------------------------------------------===//

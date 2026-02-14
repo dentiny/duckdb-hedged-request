@@ -69,6 +69,7 @@ TEST_CASE("HedgedFileSystem with fast open (no hedging)", "[hedged_file_system]"
 	REQUIRE(string(buffer.data(), bytes_read) == FAST_TEST_CONTENT);
 
 	file_handle->Close();
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem with ClientContextFileOpener", "[hedged_file_system]") {
@@ -115,6 +116,7 @@ TEST_CASE("HedgedFileSystem FileExists with slow operation", "[hedged_file_syste
 	bool exists = hedged_fs->FileExists(test_file, nullptr);
 	REQUIRE(exists == true);
 	REQUIRE(mock_fs_ptr->GetFileExistsCount() == 2);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem FileExists with fast operation", "[hedged_file_system]") {
@@ -132,6 +134,7 @@ TEST_CASE("HedgedFileSystem FileExists with fast operation", "[hedged_file_syste
 	bool exists = hedged_fs->FileExists(test_file, nullptr);
 	REQUIRE(exists == true);
 	REQUIRE(mock_fs_ptr->GetFileExistsCount() == 1);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem DirectoryExists with slow operation", "[hedged_file_system]") {
@@ -150,6 +153,7 @@ TEST_CASE("HedgedFileSystem DirectoryExists with slow operation", "[hedged_file_
 	bool exists = hedged_fs->DirectoryExists(test_dir, nullptr);
 	REQUIRE(exists == true);
 	REQUIRE(mock_fs_ptr->GetDirectoryExistsCount() == 2);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem DirectoryExists with fast operation", "[hedged_file_system]") {
@@ -168,6 +172,7 @@ TEST_CASE("HedgedFileSystem DirectoryExists with fast operation", "[hedged_file_
 	bool exists = hedged_fs->DirectoryExists(test_dir, nullptr);
 	REQUIRE(exists == true);
 	REQUIRE(mock_fs_ptr->GetDirectoryExistsCount() == 1);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem ListFiles with slow operation", "[hedged_file_system]") {
@@ -185,17 +190,19 @@ TEST_CASE("HedgedFileSystem ListFiles with slow operation", "[hedged_file_system
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
 	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
 
-	auto files = make_shared_ptr<vector<string>>();
-	auto files_mutex = make_shared_ptr<mutex>();
-	bool success = hedged_fs->ListFiles(test_dir, [files, files_mutex](const string &name, bool is_dir) {
-		if (!is_dir) {
-			const lock_guard<mutex> lock(*files_mutex);
-			files->push_back(name);
-		}
-	}, nullptr);
+	vector<string> files;
+	bool success = hedged_fs->ListFiles(
+	    test_dir,
+	    [&files](const string &name, bool is_dir) {
+		    if (!is_dir) {
+			    files.push_back(name);
+		    }
+	    },
+	    nullptr);
 	REQUIRE(success == true);
-	REQUIRE(files->size() == 2);
+	REQUIRE(files.size() == 2);
 	REQUIRE(mock_fs_ptr->GetListFilesCount() == 2);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem Glob with slow operation", "[hedged_file_system]") {
@@ -216,6 +223,7 @@ TEST_CASE("HedgedFileSystem Glob with slow operation", "[hedged_file_system]") {
 	vector<OpenFileInfo> results = hedged_fs->Glob(glob_pattern, nullptr);
 	REQUIRE(results.size() >= 2);
 	REQUIRE(mock_fs_ptr->GetGlobCount() == 2);
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem GetFileSize with slow operation", "[hedged_file_system]") {
@@ -239,6 +247,7 @@ TEST_CASE("HedgedFileSystem GetFileSize with slow operation", "[hedged_file_syst
 	REQUIRE(mock_fs_ptr->GetFileSizeCount() == 2);
 
 	file_handle->Close();
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem GetLastModifiedTime with slow operation", "[hedged_file_system]") {
@@ -262,6 +271,7 @@ TEST_CASE("HedgedFileSystem GetLastModifiedTime with slow operation", "[hedged_f
 	REQUIRE(mock_fs_ptr->GetLastModifiedTimeCount() == 2);
 
 	file_handle->Close();
+	entry->WaitAll();
 }
 
 TEST_CASE("HedgedFileSystem GetFileType with slow operation", "[hedged_file_system]") {
@@ -285,4 +295,5 @@ TEST_CASE("HedgedFileSystem GetFileType with slow operation", "[hedged_file_syst
 	REQUIRE(mock_fs_ptr->GetFileTypeCount() == 2);
 
 	file_handle->Close();
+	entry->WaitAll();
 }
