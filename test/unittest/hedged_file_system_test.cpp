@@ -17,10 +17,10 @@
 using namespace duckdb; // NOLINT
 
 namespace {
-constexpr const char *TEST_CONTENT =
+const string TEST_CONTENT =
     "Hello, HedgedFileSystem! This is a test file for hedged reads.\nThe quick brown fox jumps over the lazy dog.\n";
-constexpr const char *FAST_TEST_CONTENT = "Fast test file\n";
-constexpr const char *DB_TEST_CONTENT = "Database test file\n";
+const string FAST_TEST_CONTENT = "Fast test file\n";
+const string DB_TEST_CONTENT = "Database test file\n";
 } // namespace
 
 TEST_CASE("HedgedFileSystem with slow open", "[hedged_file_system]") {
@@ -37,8 +37,8 @@ TEST_CASE("HedgedFileSystem with slow open", "[hedged_file_system]") {
 	REQUIRE(file_handle != nullptr);
 
 	array<char, 256> buffer {};
-	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(TEST_CONTENT)));
-	REQUIRE(bytes_read == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(TEST_CONTENT.size()));
+	REQUIRE(bytes_read == NumericCast<int64_t>(TEST_CONTENT.size()));
 	REQUIRE(string(buffer.data(), bytes_read) == TEST_CONTENT);
 
 	file_handle->Close();
@@ -58,8 +58,8 @@ TEST_CASE("HedgedFileSystem with fast open (no hedging)", "[hedged_file_system]"
 	REQUIRE(file_handle != nullptr);
 
 	array<char, 256> buffer {};
-	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(FAST_TEST_CONTENT)));
-	REQUIRE(bytes_read == NumericCast<int64_t>(strlen(FAST_TEST_CONTENT)));
+	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(FAST_TEST_CONTENT.size()));
+	REQUIRE(bytes_read == NumericCast<int64_t>(FAST_TEST_CONTENT.size()));
 	REQUIRE(string(buffer.data(), bytes_read) == FAST_TEST_CONTENT);
 
 	file_handle->Close();
@@ -85,8 +85,8 @@ TEST_CASE("HedgedFileSystem with ClientContextFileOpener", "[hedged_file_system]
 	REQUIRE(file_handle != nullptr);
 
 	array<char, 256> buffer {};
-	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(TEST_CONTENT)));
-	REQUIRE(bytes_read == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(TEST_CONTENT.size()));
+	REQUIRE(bytes_read == NumericCast<int64_t>(TEST_CONTENT.size()));
 	REQUIRE(string(buffer.data(), bytes_read) == TEST_CONTENT);
 
 	file_handle->Close();
@@ -213,7 +213,7 @@ TEST_CASE("HedgedFileSystem GetFileSize with slow operation", "[hedged_file_syst
 	REQUIRE(file_handle != nullptr);
 
 	int64_t file_size = hedged_fs->GetFileSize(*file_handle);
-	REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+	REQUIRE(file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
 
 	file_handle->Close();
 	entry->WaitAll();
@@ -276,12 +276,12 @@ TEST_CASE("HedgedFileSystem GetFileSize with early file handle destruction", "[h
 		REQUIRE(file_handle != nullptr);
 
 		file_size = hedged_fs->GetFileSize(*file_handle);
-		REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+		REQUIRE(file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
 	}
 
 	// Wait for all pending hedged requests to complete
 	entry->WaitAll();
-	REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+	REQUIRE(file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
 }
 
 TEST_CASE("HedgedFileSystem GetLastModifiedTime with early file handle destruction", "[hedged_file_system]") {
