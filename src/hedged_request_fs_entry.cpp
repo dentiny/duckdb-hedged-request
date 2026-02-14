@@ -18,10 +18,9 @@ void HedgedRequestFsEntry::AddPendingRequest(FutureWrapper<void> future) {
 }
 
 void HedgedRequestFsEntry::CleanupCompleted() {
-	pending_requests.erase(
-	    std::remove_if(pending_requests.begin(), pending_requests.end(),
-	                   [](FutureWrapper<void> &f) { return f.IsReady(); }),
-	    pending_requests.end());
+	pending_requests.erase(std::remove_if(pending_requests.begin(), pending_requests.end(),
+	                                      [](FutureWrapper<void> &f) { return f.IsReady(); }),
+	                       pending_requests.end());
 }
 
 void HedgedRequestFsEntry::WaitAll() {
@@ -33,4 +32,3 @@ void HedgedRequestFsEntry::WaitAll() {
 }
 
 } // namespace duckdb
-

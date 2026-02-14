@@ -18,13 +18,13 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 	}
 
 	// Possibility-1: client context file opener
-	auto* client_context_opener = dynamic_cast<ClientContextFileOpener*>(opener.get());
+	auto *client_context_opener = dynamic_cast<ClientContextFileOpener *>(opener.get());
 	if (client_context_opener != nullptr) {
 		return make_shared_ptr<ClientContextFileOpener>(*client_context_opener->TryGetClientContext());
 	}
 
 	// Possibility-2: database file opener
-	auto* database_file_opener = dynamic_cast<DatabaseFileOpener*>(opener.get());
+	auto *database_file_opener = dynamic_cast<DatabaseFileOpener *>(opener.get());
 	D_ASSERT(database_file_opener != nullptr);
 	return make_shared_ptr<DatabaseFileOpener>(*database_file_opener->TryGetDatabase());
 }
@@ -36,7 +36,7 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 
 HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chrono::milliseconds timeout_p,
                                    shared_ptr<HedgedRequestFsEntry> entry_p)
-    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)), db(std::move(db_p)) {
+    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)) {
 	if (!this->wrapped_fs) {
 		throw InternalException("HedgedFileSystem: wrapped_fs cannot be null");
 	}
@@ -48,16 +48,17 @@ HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chr
 HedgedFileSystem::~HedgedFileSystem() {
 }
 
+// TODO(hjiang): add a test for this function.
 unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFlags flags,
-                                                   optional_ptr<FileOpener> opener) {
+                                                  optional_ptr<FileOpener> opener) {
 	auto token = make_shared_ptr<Token>();
 	using FutureType = FutureWrapper<unique_ptr<FileHandle>>;
 
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
 	auto open_fn = std::function<unique_ptr<FileHandle>()>(
-	    [fs_ptr, path, flags, opener_copy]() { return fs_ptr->OpenFile(path, flags, *opener_copy); });
-	FutureType primary{open_fn, token};
+	    [fs_ptr, path, flags, opener_copy]() { return fs_ptr->OpenFile(path, flags, opener_copy.get()); });
+	FutureType primary {open_fn, token};
 
 	{
 		unique_lock<mutex> lock(token->mu);
@@ -78,8 +79,7 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	auto wait_result = WaitForAny(std::move(futs), token);
 	for (auto &fut : wait_result.pending_futures) {
 		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		entry->AddPendingRequest(
-		    FutureWrapper<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); })));
+		entry->AddPendingRequest(FutureWrapper<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); })));
 	}
 
 	return make_uniq<HedgedFileHandle>(*this, std::move(wait_result.result), path);
@@ -148,7 +148,7 @@ void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<Fil
 }
 
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
-                                  FileOpener *opener) {
+                                 FileOpener *opener) {
 	return wrapped_fs->ListFiles(directory, callback, opener);
 }
 
