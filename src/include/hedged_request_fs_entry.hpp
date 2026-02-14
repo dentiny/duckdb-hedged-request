@@ -3,6 +3,7 @@
 #include "duckdb/common/vector.hpp"
 #include "duckdb/storage/object_cache.hpp"
 #include "future_utils.hpp"
+#include "hedged_request_config.hpp"
 #include "thread_annotation.hpp"
 
 namespace duckdb {
@@ -27,12 +28,19 @@ public:
 	// Block wait for all pending requests to complete.
 	void WaitAll();
 
+	// Get the hedged request configuration
+	HedgedRequestConfig GetConfig() const;
+
+	// Update a specific operation's delay threshold directly
+	void UpdateConfig(HedgedRequestOperation operation, std::chrono::milliseconds delay_ms);
+
 private:
 	// Try to clean up completed requests in a non-blocking style.
 	void CleanupCompleted() DUCKDB_REQUIRES(cache_mutex);
 
-	mutex cache_mutex;
+	mutable mutex cache_mutex;
 	vector<FutureWrapper<void>> pending_requests DUCKDB_GUARDED_BY(cache_mutex);
+	HedgedRequestConfig config DUCKDB_GUARDED_BY(cache_mutex);
 };
 
 } // namespace duckdb
