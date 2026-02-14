@@ -48,4 +48,9 @@ void HedgedRequestFsEntry::UpdateConfig(HedgedRequestOperation operation, std::c
 	config.delays_ms[static_cast<size_t>(operation)] = delay_ms;
 }
 
+void HedgedRequestFsEntry::UpdateMaxHedgedRequestCount(size_t max_count) {
+	const lock_guard<mutex> lock(cache_mutex);
+	config.max_hedged_request_count = max_count;
+}
+
 } // namespace duckdb

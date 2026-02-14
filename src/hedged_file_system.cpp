@@ -13,6 +13,7 @@
 namespace duckdb {
 
 namespace {
+// Copy file opener to make sure it's always valid in all requests, which could happen in background threads.
 shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 	if (opener == nullptr) {
 		return nullptr;
@@ -31,32 +32,52 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 }
 
 template <typename T>
-T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds timeout, shared_ptr<HedgedRequestFsEntry> entry) {
+bool HasAnyReady(const vector<FutureWrapper<T>> &futs) {
+	for (const auto &fut : futs) {
+		if (fut.IsReady()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+template <typename T>
+T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_delay,
+                shared_ptr<HedgedRequestFsEntry> entry) {
 	auto token = make_shared_ptr<Token>();
 	using FutureType = FutureWrapper<T>;
 
 	FutureType primary {fn, token};
-
-	{
-		unique_lock<mutex> lock(token->mu);
-		token->cv.wait_for(lock, timeout, [&] { return token->completed; });
-		token->completed = false;
-	}
-	if (primary.IsReady()) {
-		return primary.Get();
-	}
-
-	// Start the hedged request
-	FutureType hedged(fn, token);
 	vector<FutureType> futs;
-	futs.reserve(2);
 	futs.emplace_back(std::move(primary));
-	futs.emplace_back(std::move(hedged));
 
+	auto config = entry->GetConfig();
+
+	// Keep spawning hedged requests at threshold intervals until one completes or max count reached
+	while (true) {
+		{
+			unique_lock<mutex> lock(token->mu);
+			token->cv.wait_for(lock, hedged_request_delay, [&token] { return token->completed; });
+			if (token->completed) {
+				break;
+			}
+		}
+
+		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
+		if (futs.size() >= config.max_hedged_request_count) {
+			continue;
+		}
+
+		// No request completed yet, spawn a new hedged request
+		FutureType hedged(fn, token);
+		futs.emplace_back(std::move(hedged));
+	}
+
+	// One of the requests finished (whether it succeeded or failed), now get the result
 	auto wait_result = WaitForAny(std::move(futs), token);
 	for (auto &fut : wait_result.pending_futures) {
 		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		entry->AddPendingRequest([pending_fut]() { pending_fut->Wait(); });
+		entry->AddPendingRequest([pending_fut = std::move(pending_fut)]() { pending_fut->Wait(); });
 	}
 
 	return std::move(wait_result.result);
@@ -67,9 +88,8 @@ T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds timeout, shared
 // HedgedFileSystem
 //===--------------------------------------------------------------------===//
 
-HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chrono::milliseconds timeout_p,
-                                   shared_ptr<HedgedRequestFsEntry> entry_p)
-    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)) {
+HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, shared_ptr<HedgedRequestFsEntry> entry_p)
+    : wrapped_fs(std::move(wrapped_fs_p)), entry(std::move(entry_p)) {
 	if (!this->wrapped_fs) {
 		throw InternalException("HedgedFileSystem: wrapped_fs cannot be null");
 	}

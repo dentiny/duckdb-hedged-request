@@ -14,10 +14,7 @@ class HedgedRequestFsEntry;
 // HedgedFileSystem is a wrapper filesystem that performs hedged requests on slow IO operations.
 class HedgedFileSystem : public FileSystem {
 public:
-	explicit HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs,
-	                          // TODO(hjiang): provide hedged request config.
-	                          std::chrono::milliseconds timeout_p = std::chrono::milliseconds(3000),
-	                          shared_ptr<HedgedRequestFsEntry> entry_p = nullptr);
+	HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs, shared_ptr<HedgedRequestFsEntry> entry_p);
 	~HedgedFileSystem() override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
@@ -72,7 +69,6 @@ public:
 
 private:
 	unique_ptr<FileSystem> wrapped_fs;
-	std::chrono::milliseconds timeout;
 	shared_ptr<HedgedRequestFsEntry> entry;
 };
 
