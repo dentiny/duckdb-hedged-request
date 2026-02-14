@@ -17,9 +17,6 @@ namespace duckdb {
 
 namespace {
 
-// TODO(hjiang): Temporary timeout config, need to specify in config.
-constexpr int64_t DEFAULT_TIMEOUT_MS = 3000;
-
 // Util to get the VirtualFileSystem from context
 FileSystem &GetVirtualFileSystem(ClientContext &context) {
 	auto &db = DatabaseInstance::GetDatabase(context);
@@ -92,8 +89,7 @@ void HedgedFsWrapFunction(DataChunk &args, ExpressionState &state, Vector &resul
 			    "Filesystem '%s' not found. Use hedged_fs_list_filesystems() to see available filesystems.", fs_str);
 		}
 
-		auto wrapped_fs =
-		    make_uniq<HedgedFileSystem>(std::move(extracted_fs), std::chrono::milliseconds(DEFAULT_TIMEOUT_MS), entry);
+		auto wrapped_fs = make_uniq<HedgedFileSystem>(std::move(extracted_fs), entry);
 		string wrapped_name = wrapped_fs->GetName();
 		vfs.RegisterSubSystem(std::move(wrapped_fs));
 		auto &db = DatabaseInstance::GetDatabase(context);

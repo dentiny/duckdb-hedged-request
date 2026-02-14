@@ -32,12 +32,17 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     5000  // LIST_FILES
 };
 
+// Default maximum number of hedged requests to spawn
+constexpr size_t DEFAULT_MAX_HEDGED_REQUEST_COUNT = 3;
+
 // Configuration for hedged request thresholds, notice it's different from operation timeouts.
 struct HedgedRequestConfig {
 	// Delay before starting hedged request for each operation (in milliseconds)
 	duckdb::array<std::chrono::milliseconds, static_cast<size_t>(HedgedRequestOperation::COUNT)> delays_ms;
+	// Maximum number of hedged requests to spawn
+	size_t max_hedged_request_count;
 
-	HedgedRequestConfig() {
+	HedgedRequestConfig() : max_hedged_request_count(DEFAULT_MAX_HEDGED_REQUEST_COUNT) {
 		for (size_t idx = 0; idx < static_cast<size_t>(HedgedRequestOperation::COUNT); ++idx) {
 			delays_ms[idx] = std::chrono::milliseconds(DEFAULT_HEDGING_DELAYS_MS[idx]);
 		}

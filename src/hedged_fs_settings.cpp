@@ -1,6 +1,7 @@
 #include "hedged_fs_settings.hpp"
 
 #include "duckdb/common/exception.hpp"
+#include "duckdb/common/numeric_utils.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/storage/object_cache.hpp"
@@ -69,6 +70,14 @@ void SetListFilesHedgingDelay(ClientContext &context, SetScope scope, Value &par
 	UpdateConfigDelay(context, scope, "hedged_fs_list_files_delay_ms", HedgedRequestOperation::LIST_FILES, value_ms);
 }
 
+void SetMaxHedgedRequestCount(ClientContext &context, SetScope scope, Value &parameter) {
+	auto max_count = parameter.GetValue<uint64_t>();
+	auto &db = DatabaseInstance::GetDatabase(context);
+	auto &object_cache = db.GetObjectCache();
+	auto entry = object_cache.GetOrCreate<HedgedRequestFsEntry>(HedgedRequestFsEntry::ObjectType());
+	entry->UpdateMaxHedgedRequestCount(NumericCast<size_t>(max_count));
+}
+
 } // namespace
 
 void RegisterHedgedFsSettings(DatabaseInstance &db) {
@@ -127,6 +136,10 @@ void RegisterHedgedFsSettings(DatabaseInstance &db) {
 	    LogicalType::UBIGINT,
 	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::LIST_FILES)]),
 	    SetListFilesHedgingDelay);
+
+	config.AddExtensionOption("hedged_fs_max_hedged_request_count",
+	                          "Maximum number of hedged requests to spawn for each operation", LogicalType::UBIGINT,
+	                          Value::UBIGINT(DEFAULT_MAX_HEDGED_REQUEST_COUNT), SetMaxHedgedRequestCount);
 }
 
 } // namespace duckdb
