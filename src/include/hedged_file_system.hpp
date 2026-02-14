@@ -14,8 +14,8 @@ class HedgedFileSystem : public FileSystem {
 public:
 	explicit HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs,
 							  // TODO(hjiang): provide hedged request config.
-	                          std::chrono::milliseconds timeout = std::chrono::milliseconds(3000),
-	                          shared_ptr<HedgedRequestFsEntry> cache);
+	                          std::chrono::milliseconds timeout_p = std::chrono::milliseconds(3000),
+	                          shared_ptr<HedgedRequestFsEntry> entry_p);
 	~HedgedFileSystem() override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,

@@ -61,7 +61,7 @@ public:
 		if (worker.joinable()) {
 			worker.join();
 		}
-		lock_guard<mutex> lock(state->mu);
+		const lock_guard<mutex> lock(state->mu);
 		if (state->exception) {
 			std::rethrow_exception(state->exception);
 		}
@@ -134,7 +134,7 @@ public:
 		if (worker.joinable()) {
 			worker.join();
 		}
-		lock_guard<mutex> lock(state->mu);
+		const lock_guard<mutex> lock(state->mu);
 		if (state->exception) {
 			std::rethrow_exception(state->exception);
 		}
@@ -175,7 +175,7 @@ FutureWrapper<T> CreateFuture(std::function<T()> functor, shared_ptr<Token> toke
 		try {
 			auto result = functor();
 			{
-				lock_guard<mutex> lock(state->mu);
+				const lock_guard<mutex> lock(state->mu);
 				state->result = std::move(result);
 				state->ready = true;
 			}
@@ -186,9 +186,8 @@ FutureWrapper<T> CreateFuture(std::function<T()> functor, shared_ptr<Token> toke
 				state->ready = true;
 			}
 		}
-		// Signal the token
 		{
-			lock_guard<mutex> lock(tok->mu);
+			const lock_guard<mutex> lock(tok->mu);
 			tok->completed = true;
 			tok->cv.notify_all();
 		}
@@ -210,19 +209,19 @@ inline FutureWrapper<void> CreateFuture(std::function<void()> functor, shared_pt
 		try {
 			functor();
 			{
-				lock_guard<mutex> lock(state->mu);
+				const lock_guard<mutex> lock(state->mu);
 				state->ready = true;
 			}
 		} catch (...) {
 			{
-				lock_guard<mutex> lock(state->mu);
+				const lock_guard<mutex> lock(state->mu);
 				state->exception = std::current_exception();
 				state->ready = true;
 			}
 		}
 		// Signal the token
 		{
-			lock_guard<mutex> lock(tok->mu);
+			const lock_guard<mutex> lock(tok->mu);
 			tok->completed = true;
 		}
 		tok->cv.notify_all();

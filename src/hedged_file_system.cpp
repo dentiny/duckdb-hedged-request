@@ -10,15 +10,14 @@ namespace duckdb {
 // HedgedFileSystem
 //===--------------------------------------------------------------------===//
 
-HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs, std::chrono::milliseconds timeout,
-                                   shared_ptr<HedgedRequestFsEntry> cache)
-    : wrapped_fs(std::move(wrapped_fs)), timeout(timeout), cache(std::move(cache)) {
+HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chrono::milliseconds timeout_p,
+                                   shared_ptr<HedgedRequestFsEntry> entry_p)
+    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), cache(std::move(entry_p)) {
 	if (!this->wrapped_fs) {
 		throw InternalException("HedgedFileSystem: wrapped_fs cannot be null");
 	}
-	// Create a cache if one wasn't provided
 	if (!this->cache) {
-		this->cache = make_shared_ptr<HedgedRequestFsEntry>();
+		throw InternalException("HedgedFileSystem: cache entry cannot be null");
 	}
 }
 
@@ -28,12 +27,13 @@ HedgedFileSystem::~HedgedFileSystem() {
 unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFlags flags,
                                                    optional_ptr<FileOpener> opener) {
 	auto token = make_shared_ptr<Token>();
+	using FutureType = FutureWrapper<unique_ptr<FileHandle>>;
 
-	// Start the primary open
-	auto primary = CreateFuture<unique_ptr<FileHandle>>(
-	    std::function<unique_ptr<FileHandle>()>([&]() { return wrapped_fs->OpenFile(path, flags, opener); }), token);
+	auto *fs_ptr = wrapped_fs.get();
+	auto open_fn = std::function<unique_ptr<FileHandle>()>(
+	    [fs_ptr, path, flags, opener]() { return fs_ptr->OpenFile(path, flags, opener); });
+	auto primary = CreateFuture<unique_ptr<FileHandle>>(open_fn, token);
 
-	// Wait for the primary to complete within timeout
 	{
 		unique_lock<mutex> lock(token->mu);
 		token->cv.wait_for(lock, timeout, [&] { return token->completed; });
@@ -41,31 +41,24 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	}
 
 	if (primary.IsReady()) {
-		auto wrapped_handle = primary.Get();
-		return make_uniq<HedgedFileHandle>(*this, std::move(wrapped_handle), path);
+		return make_uniq<HedgedFileHandle>(*this, primary.Get(), path);
 	}
 
-	// Primary open timed out, start hedged open
-	auto hedged = CreateFuture<unique_ptr<FileHandle>>(
-	    std::function<unique_ptr<FileHandle>()>([&]() { return wrapped_fs->OpenFile(path, flags, opener); }), token);
-
-	// Race: collect both into a vector and wait for any
-	vector<FutureWrapper<unique_ptr<FileHandle>>> futs;
+	// Start the hedged open
+	auto hedged = CreateFuture<unique_ptr<FileHandle>>(open_fn, token);
+	vector<FutureType> futs;
+	futs.reserve(2);
 	futs.push_back(std::move(primary));
 	futs.push_back(std::move(hedged));
-
 	auto unready = WaitForAny(futs, token);
-
-	// futs now contains the ready future(s), unready contains the rest
 	auto wrapped_handle = futs[0].Get();
 
 	// Add unready futures to cache for background cleanup
 	for (auto &fut : unready) {
-		auto void_token = make_shared_ptr<Token>();
+		auto pending_token = make_shared_ptr<Token>();
+		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
 		cache->AddPendingRequest(
-		    CreateFuture<void>(std::function<void()>([f = make_shared_ptr<FutureWrapper<unique_ptr<FileHandle>>>(
-		                                                  std::move(fut))]() { f->Wait(); }),
-		                       void_token));
+		    CreateFuture<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); }), pending_token));
 	}
 
 	return make_uniq<HedgedFileHandle>(*this, std::move(wrapped_handle), path);
