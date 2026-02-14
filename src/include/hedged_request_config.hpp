@@ -32,8 +32,7 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     5000  // LIST_FILES
 };
 
-// Configuration for hedged request thresholds (when to start a hedged request)
-// These values represent the delay before triggering a hedged request, not operation timeouts
+// Configuration for hedged request thresholds, notice it's different from operation timeouts.
 struct HedgedRequestConfig {
 	// Delay before starting hedged request for each operation (in milliseconds)
 	duckdb::array<std::chrono::milliseconds, static_cast<size_t>(HedgedRequestOperation::COUNT)> delays_ms;

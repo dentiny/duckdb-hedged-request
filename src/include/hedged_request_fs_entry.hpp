@@ -31,9 +31,6 @@ public:
 	// Get the hedged request configuration
 	HedgedRequestConfig GetConfig() const;
 
-	// Update the hedged request configuration
-	void SetConfig(const HedgedRequestConfig &config);
-
 	// Update a specific operation's delay threshold directly
 	void UpdateConfig(HedgedRequestOperation operation, std::chrono::milliseconds delay_ms);
 
