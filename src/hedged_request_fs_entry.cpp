@@ -11,7 +11,9 @@ HedgedRequestFsEntry::~HedgedRequestFsEntry() {
 	WaitAll();
 }
 
-void HedgedRequestFsEntry::AddPendingRequest(FutureWrapper<void> future) {
+void HedgedRequestFsEntry::AddPendingRequest(std::function<void()> functor) {
+	auto token = make_shared_ptr<Token>();
+	FutureWrapper<void> future(std::move(functor), token);
 	const lock_guard<mutex> lock(cache_mutex);
 	pending_requests.push_back(std::move(future));
 	CleanupCompleted();

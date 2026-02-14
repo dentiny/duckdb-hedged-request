@@ -79,7 +79,7 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	auto wait_result = WaitForAny(std::move(futs), token);
 	for (auto &fut : wait_result.pending_futures) {
 		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		entry->AddPendingRequest(FutureWrapper<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); })));
+		entry->AddPendingRequest([pending_fut]() { pending_fut->Wait(); });
 	}
 
 	return make_uniq<HedgedFileHandle>(*this, std::move(wait_result.result), path);
