@@ -43,4 +43,9 @@ void HedgedRequestFsEntry::SetConfig(const HedgedRequestConfig &config_p) {
 	config = config_p;
 }
 
+void HedgedRequestFsEntry::UpdateConfig(HedgedRequestOperation operation, std::chrono::milliseconds delay_ms) {
+	const lock_guard<mutex> lock(cache_mutex);
+	config.delays_ms[static_cast<size_t>(operation)] = delay_ms;
+}
+
 } // namespace duckdb

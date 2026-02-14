@@ -34,6 +34,9 @@ public:
 	// Update the hedged request configuration
 	void SetConfig(const HedgedRequestConfig &config);
 
+	// Update a specific operation's delay threshold directly
+	void UpdateConfig(HedgedRequestOperation operation, std::chrono::milliseconds delay_ms);
+
 private:
 	// Try to clean up completed requests in a non-blocking style.
 	void CleanupCompleted() DUCKDB_REQUIRES(cache_mutex);

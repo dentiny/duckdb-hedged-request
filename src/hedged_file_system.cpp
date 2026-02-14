@@ -8,6 +8,7 @@
 #include "duckdb/main/database_file_opener.hpp"
 #include "duckdb/storage/object_cache.hpp"
 #include "future_utils.hpp"
+#include "hedged_request_config.hpp"
 
 namespace duckdb {
 
@@ -216,7 +217,7 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	    std::function<unique_ptr<FileHandle>()>([fs_ptr, path_copy = path, flags, opener_copy]() {
 		    return fs_ptr->OpenFile(path_copy, flags, opener_copy.get());
 	    }),
-	    config.open_file_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::OPEN_FILE)], entry);
 	return make_uniq<HedgedFileHandle>(*this, std::move(result), path);
 }
 
@@ -227,7 +228,7 @@ bool HedgedFileSystem::DirectoryExists(const string &directory, optional_ptr<Fil
 	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, directory_copy = directory, opener_copy]() {
 		                           return fs_ptr->DirectoryExists(directory_copy, opener_copy.get());
 	                           }),
-	                           config.directory_exists_hedging_delay_ms, entry);
+	                           config.delays_ms[static_cast<size_t>(HedgedRequestOperation::DIRECTORY_EXISTS)], entry);
 }
 
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
@@ -248,7 +249,7 @@ bool HedgedFileSystem::ListFiles(const string &directory, const std::function<vo
 		        },
 		        opener_copy.get());
 	    }),
-	    config.list_files_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::LIST_FILES)], entry);
 
 	if (success) {
 		for (auto &result : *results) {
@@ -265,7 +266,7 @@ bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpene
 	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, filename_copy = filename, opener_copy]() {
 		                           return fs_ptr->FileExists(filename_copy, opener_copy.get());
 	                           }),
-	                           config.file_exists_hedging_delay_ms, entry);
+	                           config.delays_ms[static_cast<size_t>(HedgedRequestOperation::FILE_EXISTS)], entry);
 }
 
 vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *opener) {
@@ -275,7 +276,7 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 	return HedgedRequest<vector<OpenFileInfo>>(
 	    std::function<vector<OpenFileInfo>()>(
 	        [fs_ptr, path_copy = path, opener_copy]() { return fs_ptr->Glob(path_copy, opener_copy.get()); }),
-	    config.glob_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GLOB)], entry);
 }
 
 int64_t HedgedFileSystem::GetFileSize(FileHandle &handle) {
@@ -285,7 +286,7 @@ int64_t HedgedFileSystem::GetFileSize(FileHandle &handle) {
 	auto config = entry->GetConfig();
 	return HedgedRequest<int64_t>(
 	    std::function<int64_t()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileSize(*wrapped_handle_ptr); }),
-	    config.get_file_size_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_FILE_SIZE)], entry);
 }
 
 timestamp_t HedgedFileSystem::GetLastModifiedTime(FileHandle &handle) {
@@ -293,10 +294,10 @@ timestamp_t HedgedFileSystem::GetLastModifiedTime(FileHandle &handle) {
 	auto *fs_ptr = wrapped_fs.get();
 	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
 	auto config = entry->GetConfig();
-	return HedgedRequest<timestamp_t>(std::function<timestamp_t()>([fs_ptr, wrapped_handle_ptr]() {
-		                                  return fs_ptr->GetLastModifiedTime(*wrapped_handle_ptr);
-	                                  }),
-	                                  config.get_last_modified_time_hedging_delay_ms, entry);
+	return HedgedRequest<timestamp_t>(
+	    std::function<timestamp_t()>(
+	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetLastModifiedTime(*wrapped_handle_ptr); }),
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_LAST_MODIFIED_TIME)], entry);
 }
 
 string HedgedFileSystem::GetVersionTag(FileHandle &handle) {
@@ -306,7 +307,7 @@ string HedgedFileSystem::GetVersionTag(FileHandle &handle) {
 	auto config = entry->GetConfig();
 	return HedgedRequest<string>(
 	    std::function<string()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetVersionTag(*wrapped_handle_ptr); }),
-	    config.get_version_tag_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_VERSION_TAG)], entry);
 }
 
 FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
@@ -316,7 +317,7 @@ FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
 	auto config = entry->GetConfig();
 	return HedgedRequest<FileType>(
 	    std::function<FileType()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileType(*wrapped_handle_ptr); }),
-	    config.get_file_type_hedging_delay_ms, entry);
+	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_FILE_TYPE)], entry);
 }
 
 //===--------------------------------------------------------------------===//

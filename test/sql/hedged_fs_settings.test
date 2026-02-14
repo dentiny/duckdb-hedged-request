@@ -53,3 +53,32 @@ SELECT name, value FROM duckdb_settings() WHERE name = 'hedged_fs_open_file_dela
 ----
 hedged_fs_open_file_delay_ms	3000
 
+#####################
+# Test invalid config
+####################
+
+# Test invalid input: negative value
+statement error
+SET hedged_fs_open_file_delay_ms = -1;
+----
+hedged_fs_open_file_delay_ms must be non-negative, got -1
+
+# Test invalid input: zero value
+statement error
+SET hedged_fs_open_file_delay_ms = 0;
+----
+hedged_fs_open_file_delay_ms must be non-negative, got 0
+
+# Test invalid input: negative value for different setting
+statement error
+SET hedged_fs_glob_delay_ms = -100;
+----
+hedged_fs_glob_delay_ms must be non-negative, got -100
+
+# Verify settings were not changed by invalid inputs
+query IT
+SELECT name, value FROM duckdb_settings() WHERE name IN ('hedged_fs_open_file_delay_ms', 'hedged_fs_glob_delay_ms') ORDER BY name;
+----
+hedged_fs_glob_delay_ms	2000
+hedged_fs_open_file_delay_ms	3000
+
