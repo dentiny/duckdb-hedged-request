@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/common/array.hpp"
+#include "duckdb/common/numeric_utils.hpp"
 
 #include <chrono>
 

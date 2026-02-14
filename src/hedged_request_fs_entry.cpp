@@ -1,7 +1,6 @@
 #include "hedged_request_fs_entry.hpp"
 
 #include "duckdb/common/numeric_utils.hpp"
-#include <algorithm>
 
 namespace duckdb {
 
