@@ -1,6 +1,7 @@
 #include "hedged_file_system.hpp"
+#include "hedged_request_fs_entry.hpp"
 #include "duckdb/common/file_system.hpp"
-#include "duckdb.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -22,8 +23,11 @@ int main() {
 	// Create a local filesystem
 	auto local_fs = FileSystem::CreateLocal();
 
+	// Create a HedgedRequestFsEntry
+	auto entry = make_shared<HedgedRequestFsEntry>();
+
 	// Wrap it with HedgedFileSystem (3 second timeout)
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(local_fs), std::chrono::milliseconds(3000));
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(local_fs), std::chrono::milliseconds(3000), entry);
 
 	std::cout << "Filesystem name: " << hedged_fs->GetName() << std::endl;
 

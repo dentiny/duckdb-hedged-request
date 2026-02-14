@@ -1,10 +1,34 @@
 #include "hedged_file_system.hpp"
-#include "future_utils.hpp"
+
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/helper.hpp"
+#include "duckdb/common/unique_ptr.hpp"
+#include "duckdb/main/client_context_file_opener.hpp"
+#include "duckdb/main/database.hpp"
+#include "duckdb/main/database_file_opener.hpp"
 #include "duckdb/storage/object_cache.hpp"
+#include "future_utils.hpp"
 
 namespace duckdb {
+
+namespace {
+shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
+	if (opener == nullptr) {
+		return nullptr;
+	}
+
+	// Possibility-1: client context file opener
+	auto* client_context_opener = dynamic_cast<ClientContextFileOpener*>(opener.get());
+	if (client_context_opener != nullptr) {
+		return make_shared_ptr<ClientContextFileOpener>(*client_context_opener->TryGetClientContext());
+	}
+
+	// Possibility-2: database file opener
+	auto* database_file_opener = dynamic_cast<DatabaseFileOpener*>(opener.get());
+	D_ASSERT(database_file_opener != nullptr);
+	return make_shared_ptr<DatabaseFileOpener>(*database_file_opener->TryGetDatabase());
+}
+} // namespace
 
 //===--------------------------------------------------------------------===//
 // HedgedFileSystem
@@ -12,7 +36,7 @@ namespace duckdb {
 
 HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chrono::milliseconds timeout_p,
                                    shared_ptr<HedgedRequestFsEntry> entry_p)
-    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)) {
+    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)), db(std::move(db_p)) {
 	if (!this->wrapped_fs) {
 		throw InternalException("HedgedFileSystem: wrapped_fs cannot be null");
 	}
@@ -30,17 +54,16 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	using FutureType = FutureWrapper<unique_ptr<FileHandle>>;
 
 	auto *fs_ptr = wrapped_fs.get();
-	// TODO(hjiang): create a new opener.
+	auto opener_copy = CopyFileOpener(opener);
 	auto open_fn = std::function<unique_ptr<FileHandle>()>(
-	    [fs_ptr, path, flags, opener]() { return fs_ptr->OpenFile(path, flags, opener); });
-	FutureType primary(open_fn, token);
+	    [fs_ptr, path, flags, opener_copy]() { return fs_ptr->OpenFile(path, flags, *opener_copy); });
+	FutureType primary{open_fn, token};
 
 	{
 		unique_lock<mutex> lock(token->mu);
 		token->cv.wait_for(lock, timeout, [&] { return token->completed; });
 		token->completed = false;
 	}
-
 	if (primary.IsReady()) {
 		return make_uniq<HedgedFileHandle>(*this, primary.Get(), path);
 	}
@@ -49,8 +72,8 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	FutureType hedged(open_fn, token);
 	vector<FutureType> futs;
 	futs.reserve(2);
-	futs.push_back(std::move(primary));
-	futs.push_back(std::move(hedged));
+	futs.emplace_back(std::move(primary));
+	futs.emplace_back(std::move(hedged));
 
 	auto wait_result = WaitForAny(std::move(futs), token);
 	for (auto &fut : wait_result.pending_futures) {
