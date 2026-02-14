@@ -58,7 +58,8 @@ T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_
 	while (true) {
 		{
 			unique_lock<mutex> lock(token->mu);
-			token->cv.wait_for(lock, hedged_request_delay, [&token] { return token->completed; });
+			token->cv.wait_for(lock, hedged_request_delay,
+			                   [&token]() DUCKDB_RESTRICT(token->mu) { return token->completed; });
 			if (token->completed) {
 				break;
 			}
