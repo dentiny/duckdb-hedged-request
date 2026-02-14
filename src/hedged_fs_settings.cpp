@@ -79,56 +79,56 @@ void RegisterHedgedFsSettings(DatabaseInstance &db) {
 
 	config.AddExtensionOption(
 	    "hedged_fs_open_file_delay_ms", "Delay in milliseconds before starting hedged request for OpenFile operation",
-	    LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::OPEN_FILE)]),
+	    LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::OPEN_FILE)]),
 	    SetOpenFileHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_glob_delay_ms", "Delay in milliseconds before starting hedged request for Glob operation",
-	    LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GLOB)]),
+	    LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GLOB)]),
 	    SetGlobHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_file_exists_delay_ms",
-	    "Delay in milliseconds before starting hedged request for FileExists operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::FILE_EXISTS)]),
+	    "Delay in milliseconds before starting hedged request for FileExists operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::FILE_EXISTS)]),
 	    SetFileExistsHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_directory_exists_delay_ms",
-	    "Delay in milliseconds before starting hedged request for DirectoryExists operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::DIRECTORY_EXISTS)]),
+	    "Delay in milliseconds before starting hedged request for DirectoryExists operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::DIRECTORY_EXISTS)]),
 	    SetDirectoryExistsHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_get_file_size_delay_ms",
-	    "Delay in milliseconds before starting hedged request for GetFileSize operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_FILE_SIZE)]),
+	    "Delay in milliseconds before starting hedged request for GetFileSize operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_FILE_SIZE)]),
 	    SetGetFileSizeHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_get_last_modified_time_delay_ms",
-	    "Delay in milliseconds before starting hedged request for GetLastModifiedTime operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_LAST_MODIFIED_TIME)]),
+	    "Delay in milliseconds before starting hedged request for GetLastModifiedTime operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_LAST_MODIFIED_TIME)]),
 	    SetGetLastModifiedTimeHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_get_file_type_delay_ms",
-	    "Delay in milliseconds before starting hedged request for GetFileType operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_FILE_TYPE)]),
+	    "Delay in milliseconds before starting hedged request for GetFileType operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_FILE_TYPE)]),
 	    SetGetFileTypeHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_get_version_tag_delay_ms",
-	    "Delay in milliseconds before starting hedged request for GetVersionTag operation", LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_VERSION_TAG)]),
+	    "Delay in milliseconds before starting hedged request for GetVersionTag operation", LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::GET_VERSION_TAG)]),
 	    SetGetVersionTagHedgingDelay);
 
 	config.AddExtensionOption(
 	    "hedged_fs_list_files_delay_ms", "Delay in milliseconds before starting hedged request for ListFiles operation",
-	    LogicalType::BIGINT,
-	    Value::BIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::LIST_FILES)]),
+	    LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[static_cast<size_t>(HedgedRequestOperation::LIST_FILES)]),
 	    SetListFilesHedgingDelay);
 }
 
