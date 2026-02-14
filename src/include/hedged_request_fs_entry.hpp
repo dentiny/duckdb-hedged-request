@@ -20,6 +20,7 @@ public:
 		return "hedged_request_fs_entry";
 	}
 
+	// Queue pending operations; functor represents a type-eraused operation.
 	void AddPendingRequest(std::function<void()> functor);
 
 private:
