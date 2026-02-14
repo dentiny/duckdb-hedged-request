@@ -10,6 +10,7 @@
 #include "duckdb/storage/object_cache.hpp"
 #include "future_utils.hpp"
 #include "hedged_request_config.hpp"
+#include "thread_annotation.hpp"
 
 namespace duckdb {
 
@@ -59,7 +60,7 @@ T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_
 		{
 			unique_lock<mutex> lock(token->mu);
 			token->cv.wait_for(lock, hedged_request_delay,
-			                   [&token]() DUCKDB_RESTRICT(token->mu) { return token->completed; });
+			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 			if (token->completed) {
 				break;
 			}
