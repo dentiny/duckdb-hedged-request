@@ -1,0 +1,27 @@
+# name: test/sql/hedged_fs_wrap.test
+# description: test hedged_fs wrap and list filesystems functions
+# group: [sql]
+
+require hedged_request_fs
+
+# Test listing filesystems (should include MockFileSystem registered by extension)
+query T
+SELECT name FROM hedged_fs_list_filesystems() ORDER BY name;
+----
+MockFileSystem
+
+# Test wrapping MockFileSystem with hedged filesystem
+statement ok
+SELECT hedged_fs_wrap('MockFileSystem');
+
+# Verify the wrapped filesystem is registered and MockFileSystem is removed
+query T
+SELECT name FROM hedged_fs_list_filesystems() ORDER BY name;
+----
+HedgedFileSystem - MockFileSystem
+
+# Test wrapping a non-existent filesystem (should fail)
+statement error
+SELECT hedged_fs_wrap('NonExistentFileSystem');
+----
+Filesystem 'NonExistentFileSystem' not found

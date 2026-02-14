@@ -194,7 +194,7 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 }
 
 string HedgedFileSystem::GetName() const {
-	return StringUtil::Format("HedgedFileSystem(%s)", wrapped_fs->GetName());
+	return StringUtil::Format("HedgedFileSystem - %s", wrapped_fs->GetName());
 }
 
 void HedgedFileSystem::RegisterSubSystem(unique_ptr<FileSystem> sub_fs) {
