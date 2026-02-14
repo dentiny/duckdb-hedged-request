@@ -71,7 +71,7 @@ public:
 private:
 	unique_ptr<FileSystem> wrapped_fs;
 	std::chrono::milliseconds timeout;
-	shared_ptr<HedgedRequestFsEntry> cache;
+	shared_ptr<HedgedRequestFsEntry> entry;
 };
 
 // HedgedFileHandle wraps a file handle and delegates to HedgedFileSystem for hedged reads

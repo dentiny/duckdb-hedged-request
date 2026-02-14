@@ -12,12 +12,12 @@ namespace duckdb {
 
 HedgedFileSystem::HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs_p, std::chrono::milliseconds timeout_p,
                                    shared_ptr<HedgedRequestFsEntry> entry_p)
-    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), cache(std::move(entry_p)) {
+    : wrapped_fs(std::move(wrapped_fs_p)), timeout(timeout_p), entry(std::move(entry_p)) {
 	if (!this->wrapped_fs) {
 		throw InternalException("HedgedFileSystem: wrapped_fs cannot be null");
 	}
-	if (!this->cache) {
-		throw InternalException("HedgedFileSystem: cache entry cannot be null");
+	if (!this->entry) {
+		throw InternalException("HedgedFileSystem: entry cannot be null");
 	}
 }
 
@@ -30,9 +30,10 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	using FutureType = FutureWrapper<unique_ptr<FileHandle>>;
 
 	auto *fs_ptr = wrapped_fs.get();
+	// TODO(hjiang): create a new opener.
 	auto open_fn = std::function<unique_ptr<FileHandle>()>(
 	    [fs_ptr, path, flags, opener]() { return fs_ptr->OpenFile(path, flags, opener); });
-	auto primary = CreateFuture<unique_ptr<FileHandle>>(open_fn, token);
+	FutureType primary(open_fn, token);
 
 	{
 		unique_lock<mutex> lock(token->mu);
@@ -45,23 +46,20 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 	}
 
 	// Start the hedged open
-	auto hedged = CreateFuture<unique_ptr<FileHandle>>(open_fn, token);
+	FutureType hedged(open_fn, token);
 	vector<FutureType> futs;
 	futs.reserve(2);
 	futs.push_back(std::move(primary));
 	futs.push_back(std::move(hedged));
-	auto unready = WaitForAny(futs, token);
-	auto wrapped_handle = futs[0].Get();
 
-	// Add unready futures to cache for background cleanup
-	for (auto &fut : unready) {
-		auto pending_token = make_shared_ptr<Token>();
+	auto wait_result = WaitForAny(std::move(futs), token);
+	for (auto &fut : wait_result.pending_futures) {
 		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		cache->AddPendingRequest(
-		    CreateFuture<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); }), pending_token));
+		entry->AddPendingRequest(
+		    FutureWrapper<void>(std::function<void()>([pending_fut]() { pending_fut->Wait(); })));
 	}
 
-	return make_uniq<HedgedFileHandle>(*this, std::move(wrapped_handle), path);
+	return make_uniq<HedgedFileHandle>(*this, std::move(wait_result.result), path);
 }
 
 int64_t HedgedFileSystem::Read(FileHandle &handle, void *buffer, int64_t nr_bytes) {
