@@ -1,8 +1,9 @@
 #pragma once
 
-#include "duckdb/main/database.hpp"
-
 namespace duckdb {
+
+// Forward declaration
+class DatabaseInstance;
 
 // Register all hedged filesystem settings
 void RegisterHedgedFsSettings(DatabaseInstance &db);
