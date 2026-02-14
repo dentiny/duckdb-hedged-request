@@ -88,9 +88,13 @@ public:
 		return *wrapped_handle;
 	}
 
+	shared_ptr<FileHandle> GetWrappedHandlePtr() {
+		return wrapped_handle;
+	}
+
 private:
 	HedgedFileSystem &hedged_fs;
-	unique_ptr<FileHandle> wrapped_handle;
+	shared_ptr<FileHandle> wrapped_handle;
 };
 
 } // namespace duckdb

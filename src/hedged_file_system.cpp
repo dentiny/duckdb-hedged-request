@@ -282,20 +282,23 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 int64_t HedgedFileSystem::GetFileSize(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	auto wrapped_handle_ptr = hedged_handle.GetWrappedHandlePtr();
 	auto config = entry->GetConfig();
 	return HedgedRequest<int64_t>(
-	    std::function<int64_t()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileSize(*wrapped_handle_ptr); }),
+	    std::function<int64_t()>(
+	        // Capture shared pointer to make sure it's always valid on access.
+	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileSize(*wrapped_handle_ptr); }),
 	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_FILE_SIZE)], entry);
 }
 
 timestamp_t HedgedFileSystem::GetLastModifiedTime(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	auto wrapped_handle_ptr = hedged_handle.GetWrappedHandlePtr();
 	auto config = entry->GetConfig();
 	return HedgedRequest<timestamp_t>(
 	    std::function<timestamp_t()>(
+	        // Capture shared pointer to make sure it's always valid on access.
 	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetLastModifiedTime(*wrapped_handle_ptr); }),
 	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_LAST_MODIFIED_TIME)], entry);
 }
@@ -303,20 +306,24 @@ timestamp_t HedgedFileSystem::GetLastModifiedTime(FileHandle &handle) {
 string HedgedFileSystem::GetVersionTag(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	auto wrapped_handle_ptr = hedged_handle.GetWrappedHandlePtr();
 	auto config = entry->GetConfig();
 	return HedgedRequest<string>(
-	    std::function<string()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetVersionTag(*wrapped_handle_ptr); }),
+	    std::function<string()>(
+	        // Capture shared pointer to make sure it's always valid on access.
+	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetVersionTag(*wrapped_handle_ptr); }),
 	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_VERSION_TAG)], entry);
 }
 
 FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
 	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
 	auto *fs_ptr = wrapped_fs.get();
-	auto *wrapped_handle_ptr = &hedged_handle.GetWrappedHandle();
+	auto wrapped_handle_ptr = hedged_handle.GetWrappedHandlePtr();
 	auto config = entry->GetConfig();
 	return HedgedRequest<FileType>(
-	    std::function<FileType()>([fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileType(*wrapped_handle_ptr); }),
+	    std::function<FileType()>(
+	        // Capture shared pointer to make sure it's always valid on access.
+	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->GetFileType(*wrapped_handle_ptr); }),
 	    config.delays_ms[static_cast<size_t>(HedgedRequestOperation::GET_FILE_TYPE)], entry);
 }
 
@@ -324,17 +331,21 @@ FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
 // HedgedFileHandle
 //===--------------------------------------------------------------------===//
 
-HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle, const string &path)
-    : FileHandle(fs, path, wrapped_handle->GetFlags()), hedged_fs(fs), wrapped_handle(std::move(wrapped_handle)) {
+HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle_param,
+                                   const string &path)
+    : FileHandle(fs, path, wrapped_handle_param->GetFlags()), hedged_fs(fs),
+      wrapped_handle(wrapped_handle_param.release(), [](FileHandle *handle) {
+	      if (handle) {
+		      handle->Close();
+		      delete handle;
+	      }
+      }) {
 }
 
 HedgedFileHandle::~HedgedFileHandle() {
 }
 
 void HedgedFileHandle::Close() {
-	if (wrapped_handle) {
-		wrapped_handle->Close();
-	}
 }
 
 } // namespace duckdb
