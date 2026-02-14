@@ -33,4 +33,14 @@ void HedgedRequestFsEntry::WaitAll() {
 	pending_requests.clear();
 }
 
+HedgedRequestConfig HedgedRequestFsEntry::GetConfig() const {
+	const lock_guard<mutex> lock(cache_mutex);
+	return config;
+}
+
+void HedgedRequestFsEntry::SetConfig(const HedgedRequestConfig &config_p) {
+	const lock_guard<mutex> lock(cache_mutex);
+	config = config_p;
+}
+
 } // namespace duckdb

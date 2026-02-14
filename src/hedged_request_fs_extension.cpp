@@ -7,18 +7,23 @@
 #include "duckdb/common/opener_file_system.hpp"
 #include "duckdb/function/scalar_function.hpp"
 #include "hedged_fs_functions.hpp"
+#include "hedged_fs_settings.hpp"
 #include "mock_file_system.hpp"
 
 namespace duckdb {
 
 namespace {
 void LoadInternal(ExtensionLoader &loader) {
+	auto &db = loader.GetDatabaseInstance();
+
+	// Register settings
+	RegisterHedgedFsSettings(db);
+
 	// Register filesystem management functions
 	loader.RegisterFunction(GetHedgedFsListFilesystemsFunction());
 	loader.RegisterFunction(GetHedgedFsWrapFunction());
 
 	// Register MockFileSystem at extension load for testing purpose
-	auto &db = loader.GetDatabaseInstance();
 	auto &opener_fs = db.GetFileSystem().Cast<OpenerFileSystem>();
 	auto &vfs = opener_fs.GetFileSystem();
 	vfs.RegisterSubSystem(make_uniq<MockFileSystem>());
