@@ -16,6 +16,7 @@ hedged_fs_get_last_modified_time_delay_ms	3000
 hedged_fs_get_version_tag_delay_ms	3000
 hedged_fs_glob_delay_ms	5000
 hedged_fs_list_files_delay_ms	5000
+hedged_fs_max_hedged_request_count	3
 hedged_fs_open_file_delay_ms	3000
 
 # Test updating a setting
