@@ -2,23 +2,16 @@
 # description: test hedged_request_fs extension
 # group: [sql]
 
-# Before we load the extension, this will fail
-statement error
-SELECT quack('Sam');
-----
-Catalog Error: Scalar Function with name quack does not exist!
-
-# Require statement will ensure this test is run with this extension loaded
 require hedged_request_fs
 
-# Confirm the extension works
-query I
-SELECT quack('Sam');
+# Test hedged file system with CSV union by name
+query IIII
+SELECT * FROM read_csv_auto(['https://github.com/duckdb/duckdb/raw/refs/heads/v1.2-histrionicus/data/csv/union-by-name/ubn1.csv', 'https://github.com/duckdb/duckdb/raw/refs/heads/v1.2-histrionicus/data/csv/union-by-name/ubn2.csv'] , union_by_name = true) ORDER BY a;
 ----
-Quack Sam 🐥
-
-query I
-SELECT quack_openssl_version('Michael') ILIKE 'Quack Michael, my linked OpenSSL version is OpenSSL%';
-----
-1
-
+1	2	3	NULL
+3	4	5	NULL
+34fd321	91	NULL	2020-12-30 02:25:58.745232+00
+4	5	6	NULL
+8cb123cb8	90	NULL	2020-12-30 01:25:58.745232+00
+fg5391jn4	92	NULL	2020-12-30 03:25:58.745232+00
+test	88	NULL	2020-12-30 00:25:58.745232+00

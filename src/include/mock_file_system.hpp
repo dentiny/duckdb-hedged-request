@@ -15,6 +15,9 @@ public:
 
 	void SetDelay(std::chrono::milliseconds delay_p);
 
+	idx_t GetOpenFileCount() const;
+	void ResetOpenFileCount();
+
 	string GetName() const override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
@@ -47,6 +50,8 @@ private:
 
 	mutex delay_mutex;
 	std::chrono::milliseconds delay;
+	mutable mutex count_mutex;
+	mutable idx_t open_file_count;
 };
 
 } // namespace duckdb

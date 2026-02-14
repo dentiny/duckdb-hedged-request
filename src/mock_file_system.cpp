@@ -4,12 +4,22 @@
 
 namespace duckdb {
 
-MockFileSystem::MockFileSystem() : delay(std::chrono::milliseconds(0)) {
+MockFileSystem::MockFileSystem() : delay(std::chrono::milliseconds(0)), open_file_count(0) {
 }
 
 void MockFileSystem::SetDelay(std::chrono::milliseconds delay_p) {
 	const lock_guard<mutex> lock(delay_mutex);
 	delay = delay_p;
+}
+
+idx_t MockFileSystem::GetOpenFileCount() const {
+	const lock_guard<mutex> lock(count_mutex);
+	return open_file_count;
+}
+
+void MockFileSystem::ResetOpenFileCount() {
+	const lock_guard<mutex> lock(count_mutex);
+	open_file_count = 0;
 }
 
 string MockFileSystem::GetName() const {
@@ -18,6 +28,10 @@ string MockFileSystem::GetName() const {
 
 unique_ptr<FileHandle> MockFileSystem::OpenFile(const string &path, FileOpenFlags flags,
                                                 optional_ptr<FileOpener> opener) {
+	{
+		const lock_guard<mutex> lock(count_mutex);
+		open_file_count++;
+	}
 	SimulateDelay();
 	return LocalFileSystem::OpenFile(path, flags, opener);
 }
@@ -65,6 +79,10 @@ bool MockFileSystem::ListFiles(const string &directory, const std::function<void
 
 unique_ptr<FileHandle> MockFileSystem::OpenFileExtended(const OpenFileInfo &info, FileOpenFlags flags,
                                                         optional_ptr<FileOpener> opener) {
+	{
+		const lock_guard<mutex> lock(count_mutex);
+		open_file_count++;
+	}
 	SimulateDelay();
 	return LocalFileSystem::OpenFile(info.path, flags, opener);
 }
