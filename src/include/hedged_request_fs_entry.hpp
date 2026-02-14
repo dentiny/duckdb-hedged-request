@@ -23,12 +23,12 @@ public:
 	// Queue pending operations; functor represents a type-eraused operation.
 	void AddPendingRequest(std::function<void()> functor);
 
+	// Block wait for all pending requests to complete.
+	void WaitAll();
+
 private:
 	// Try to clean up completed requests in a non-blocking style.
 	void CleanupCompleted();
-
-	// Block wait for all pending requests to complete.
-	void WaitAll();
 
 	mutex cache_mutex;
 	vector<FutureWrapper<void>> pending_requests;

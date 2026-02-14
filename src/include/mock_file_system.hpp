@@ -18,6 +18,27 @@ public:
 	idx_t GetOpenFileCount() const;
 	void ResetOpenFileCount();
 
+	idx_t GetFileExistsCount() const;
+	void ResetFileExistsCount();
+
+	idx_t GetDirectoryExistsCount() const;
+	void ResetDirectoryExistsCount();
+
+	idx_t GetListFilesCount() const;
+	void ResetListFilesCount();
+
+	idx_t GetGlobCount() const;
+	void ResetGlobCount();
+
+	idx_t GetFileSizeCount() const;
+	void ResetFileSizeCount();
+
+	idx_t GetLastModifiedTimeCount() const;
+	void ResetLastModifiedTimeCount();
+
+	idx_t GetFileTypeCount() const;
+	void ResetFileTypeCount();
+
 	string GetName() const override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
@@ -52,6 +73,13 @@ private:
 	std::chrono::milliseconds delay;
 	mutable mutex count_mutex;
 	mutable idx_t open_file_count;
+	mutable idx_t file_exists_count;
+	mutable idx_t directory_exists_count;
+	mutable idx_t list_files_count;
+	mutable idx_t glob_count;
+	mutable idx_t get_file_size_count;
+	mutable idx_t get_last_modified_time_count;
+	mutable idx_t get_file_type_count;
 };
 
 } // namespace duckdb
