@@ -1,8 +1,9 @@
 #pragma once
 
-#include "future_utils.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/storage/object_cache.hpp"
+#include "future_utils.hpp"
+#include "thread_annotation.hpp"
 
 namespace duckdb {
 
@@ -28,10 +29,10 @@ public:
 
 private:
 	// Try to clean up completed requests in a non-blocking style.
-	void CleanupCompleted();
+	void CleanupCompleted() DUCKDB_REQUIRES(cache_mutex);
 
 	mutex cache_mutex;
-	vector<FutureWrapper<void>> pending_requests;
+	vector<FutureWrapper<void>> pending_requests DUCKDB_GUARDED_BY(cache_mutex);
 };
 
 } // namespace duckdb

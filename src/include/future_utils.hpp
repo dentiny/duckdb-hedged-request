@@ -4,6 +4,7 @@
 #include "duckdb/common/mutex.hpp"
 #include "duckdb/common/shared_ptr.hpp"
 #include "duckdb/common/vector.hpp"
+#include "thread_annotation.hpp"
 
 #include <condition_variable>
 #include <functional>
@@ -13,9 +14,9 @@ namespace duckdb {
 
 // Token used to signal completion across multiple FutureWrappers.
 struct Token {
-	bool completed = false;
+	bool completed DUCKDB_GUARDED_BY(mu) = false;
 	mutex mu;
-	std::condition_variable cv;
+	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
 };
 
 // A wrapper around std::future, which shares a Token among multiple future wrappers.

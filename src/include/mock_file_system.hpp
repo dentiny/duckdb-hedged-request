@@ -2,6 +2,7 @@
 
 #include "duckdb/common/local_file_system.hpp"
 #include "duckdb/common/mutex.hpp"
+#include "thread_annotation.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -71,7 +72,7 @@ private:
 	void SimulateDelay();
 
 	mutex delay_mutex;
-	std::chrono::milliseconds delay;
+	std::chrono::milliseconds delay DUCKDB_GUARDED_BY(delay_mutex);
 	std::atomic<idx_t> open_file_count;
 	std::atomic<idx_t> file_exists_count;
 	std::atomic<idx_t> directory_exists_count;
