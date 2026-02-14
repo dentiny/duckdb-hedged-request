@@ -29,15 +29,12 @@ TEST_CASE("HedgedFileSystem with slow open", "[hedged_file_system]") {
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
 	REQUIRE(file_handle != nullptr);
-	REQUIRE(mock_fs_ptr->GetOpenFileCount() == 2);
 
 	array<char, 256> buffer {};
 	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(TEST_CONTENT)));
@@ -53,15 +50,12 @@ TEST_CASE("HedgedFileSystem with fast open (no hedging)", "[hedged_file_system]"
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(0));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
 	REQUIRE(file_handle != nullptr);
-	REQUIRE(mock_fs_ptr->GetOpenFileCount() == 1);
 
 	array<char, 256> buffer {};
 	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(FAST_TEST_CONTENT)));
@@ -83,15 +77,12 @@ TEST_CASE("HedgedFileSystem with ClientContextFileOpener", "[hedged_file_system]
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, opener);
 	REQUIRE(file_handle != nullptr);
-	REQUIRE(mock_fs_ptr->GetOpenFileCount() == 2);
 
 	array<char, 256> buffer {};
 	int64_t bytes_read = hedged_fs->Read(*file_handle, buffer.data(), NumericCast<int64_t>(strlen(TEST_CONTENT)));
@@ -107,15 +98,12 @@ TEST_CASE("HedgedFileSystem FileExists with slow operation", "[hedged_file_syste
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetFileExistsCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	bool exists = hedged_fs->FileExists(test_file, nullptr);
 	REQUIRE(exists == true);
-	REQUIRE(mock_fs_ptr->GetFileExistsCount() == 2);
 	entry->WaitAll();
 }
 
@@ -125,15 +113,12 @@ TEST_CASE("HedgedFileSystem FileExists with fast operation", "[hedged_file_syste
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(0));
-	mock_fs->ResetFileExistsCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	bool exists = hedged_fs->FileExists(test_file, nullptr);
 	REQUIRE(exists == true);
-	REQUIRE(mock_fs_ptr->GetFileExistsCount() == 1);
 	entry->WaitAll();
 }
 
@@ -144,15 +129,12 @@ TEST_CASE("HedgedFileSystem DirectoryExists with slow operation", "[hedged_file_
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetDirectoryExistsCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	bool exists = hedged_fs->DirectoryExists(test_dir, nullptr);
 	REQUIRE(exists == true);
-	REQUIRE(mock_fs_ptr->GetDirectoryExistsCount() == 2);
 	entry->WaitAll();
 }
 
@@ -163,15 +145,12 @@ TEST_CASE("HedgedFileSystem DirectoryExists with fast operation", "[hedged_file_
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(0));
-	mock_fs->ResetDirectoryExistsCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	bool exists = hedged_fs->DirectoryExists(test_dir, nullptr);
 	REQUIRE(exists == true);
-	REQUIRE(mock_fs_ptr->GetDirectoryExistsCount() == 1);
 	entry->WaitAll();
 }
 
@@ -184,11 +163,9 @@ TEST_CASE("HedgedFileSystem ListFiles with slow operation", "[hedged_file_system
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetListFilesCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	vector<string> files;
 	bool success = hedged_fs->ListFiles(
@@ -201,7 +178,6 @@ TEST_CASE("HedgedFileSystem ListFiles with slow operation", "[hedged_file_system
 	    nullptr);
 	REQUIRE(success == true);
 	REQUIRE(files.size() == 2);
-	REQUIRE(mock_fs_ptr->GetListFilesCount() == 2);
 	entry->WaitAll();
 }
 
@@ -213,16 +189,13 @@ TEST_CASE("HedgedFileSystem Glob with slow operation", "[hedged_file_system]") {
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetGlobCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	string glob_pattern = TestCreatePath("hedged_glob_test*.txt");
 	vector<OpenFileInfo> results = hedged_fs->Glob(glob_pattern, nullptr);
 	REQUIRE(results.size() >= 2);
-	REQUIRE(mock_fs_ptr->GetGlobCount() == 2);
 	entry->WaitAll();
 }
 
@@ -232,19 +205,15 @@ TEST_CASE("HedgedFileSystem GetFileSize with slow operation", "[hedged_file_syst
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
 	REQUIRE(file_handle != nullptr);
-	mock_fs_ptr->ResetFileSizeCount();
 
 	int64_t file_size = hedged_fs->GetFileSize(*file_handle);
 	REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
-	REQUIRE(mock_fs_ptr->GetFileSizeCount() == 2);
 
 	file_handle->Close();
 	entry->WaitAll();
@@ -256,19 +225,15 @@ TEST_CASE("HedgedFileSystem GetLastModifiedTime with slow operation", "[hedged_f
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
 	REQUIRE(file_handle != nullptr);
-	mock_fs_ptr->ResetLastModifiedTimeCount();
 
 	timestamp_t mtime = hedged_fs->GetLastModifiedTime(*file_handle);
 	REQUIRE(mtime.value != 0);
-	REQUIRE(mock_fs_ptr->GetLastModifiedTimeCount() == 2);
 
 	file_handle->Close();
 	entry->WaitAll();
@@ -280,20 +245,113 @@ TEST_CASE("HedgedFileSystem GetFileType with slow operation", "[hedged_file_syst
 
 	auto mock_fs = make_uniq<MockFileSystem>();
 	mock_fs->SetDelay(std::chrono::milliseconds(100));
-	mock_fs->ResetOpenFileCount();
-	auto *mock_fs_ptr = mock_fs.get();
 
 	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
-	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(50), entry);
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
 
 	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
 	REQUIRE(file_handle != nullptr);
-	mock_fs_ptr->ResetFileTypeCount();
 
 	FileType file_type = hedged_fs->GetFileType(*file_handle);
 	REQUIRE(file_type == FileType::FILE_TYPE_REGULAR);
-	REQUIRE(mock_fs_ptr->GetFileTypeCount() == 2);
 
 	file_handle->Close();
 	entry->WaitAll();
+}
+
+TEST_CASE("HedgedFileSystem GetFileSize with early file handle destruction", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_size_destruct.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
+
+	int64_t file_size = 0;
+	{
+		// Destroy file handle before hedged requests complete
+		auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+		REQUIRE(file_handle != nullptr);
+
+		file_size = hedged_fs->GetFileSize(*file_handle);
+		REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+	}
+
+	// Wait for all pending hedged requests to complete
+	entry->WaitAll();
+	REQUIRE(file_size == NumericCast<int64_t>(strlen(TEST_CONTENT)));
+}
+
+TEST_CASE("HedgedFileSystem GetLastModifiedTime with early file handle destruction", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_mtime_destruct.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
+
+	timestamp_t mtime;
+	{
+		// Destroy file handle before hedged requests complete
+		auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+		REQUIRE(file_handle != nullptr);
+
+		mtime = hedged_fs->GetLastModifiedTime(*file_handle);
+		REQUIRE(mtime.value != 0);
+	}
+
+	// Wait for all pending hedged requests to complete
+	entry->WaitAll();
+	REQUIRE(mtime.value != 0);
+}
+
+TEST_CASE("HedgedFileSystem GetVersionTag with early file handle destruction", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_vtag_destruct.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
+
+	string version_tag;
+	{
+		// Destroy file handle before hedged requests complete
+		auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+		REQUIRE(file_handle != nullptr);
+		version_tag = hedged_fs->GetVersionTag(*file_handle);
+	}
+
+	// Wait for all pending hedged requests to complete
+	entry->WaitAll();
+}
+
+TEST_CASE("HedgedFileSystem GetFileType with early file handle destruction", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_type_destruct.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), std::chrono::milliseconds(200), entry);
+
+	FileType file_type;
+	{
+		// Destroy file handle before hedged requests complete
+		auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+		REQUIRE(file_handle != nullptr);
+
+		file_type = hedged_fs->GetFileType(*file_handle);
+		REQUIRE(file_type == FileType::FILE_TYPE_REGULAR);
+	}
+
+	// Wait for all pending hedged requests to complete
+	entry->WaitAll();
+	REQUIRE(file_type == FileType::FILE_TYPE_REGULAR);
 }

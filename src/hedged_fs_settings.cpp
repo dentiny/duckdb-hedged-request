@@ -13,9 +13,6 @@ namespace {
 
 void UpdateConfigDelay(ClientContext &context, SetScope scope, const string &setting_name,
                        HedgedRequestOperation operation, int64_t value_ms) {
-	if (value_ms <= 0) {
-		throw InvalidInputException("%s must be non-negative, got %lld", setting_name, value_ms);
-	}
 	auto &db = DatabaseInstance::GetDatabase(context);
 	auto &object_cache = db.GetObjectCache();
 	auto entry = object_cache.GetOrCreate<HedgedRequestFsEntry>(HedgedRequestFsEntry::ObjectType());
@@ -23,52 +20,52 @@ void UpdateConfigDelay(ClientContext &context, SetScope scope, const string &set
 }
 
 void SetOpenFileHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_open_file_delay_ms", HedgedRequestOperation::OPEN_FILE, value_ms);
 }
 
 void SetGlobHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_glob_delay_ms", HedgedRequestOperation::GLOB, value_ms);
 }
 
 void SetFileExistsHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_file_exists_delay_ms", HedgedRequestOperation::FILE_EXISTS, value_ms);
 }
 
 void SetDirectoryExistsHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_directory_exists_delay_ms", HedgedRequestOperation::DIRECTORY_EXISTS,
 	                  value_ms);
 }
 
 void SetGetFileSizeHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_get_file_size_delay_ms", HedgedRequestOperation::GET_FILE_SIZE,
 	                  value_ms);
 }
 
 void SetGetLastModifiedTimeHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_get_last_modified_time_delay_ms",
 	                  HedgedRequestOperation::GET_LAST_MODIFIED_TIME, value_ms);
 }
 
 void SetGetFileTypeHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_get_file_type_delay_ms", HedgedRequestOperation::GET_FILE_TYPE,
 	                  value_ms);
 }
 
 void SetGetVersionTagHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_get_version_tag_delay_ms", HedgedRequestOperation::GET_VERSION_TAG,
 	                  value_ms);
 }
 
 void SetListFilesHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
-	auto value_ms = parameter.GetValue<int64_t>();
+	auto value_ms = parameter.GetValue<uint64_t>();
 	UpdateConfigDelay(context, scope, "hedged_fs_list_files_delay_ms", HedgedRequestOperation::LIST_FILES, value_ms);
 }
 

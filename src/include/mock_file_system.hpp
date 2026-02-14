@@ -4,7 +4,6 @@
 #include "duckdb/common/mutex.hpp"
 #include "thread_annotation.hpp"
 
-#include <atomic>
 #include <chrono>
 
 namespace duckdb {
@@ -16,30 +15,6 @@ public:
 	MockFileSystem();
 
 	void SetDelay(std::chrono::milliseconds delay_p);
-
-	idx_t GetOpenFileCount() const;
-	void ResetOpenFileCount();
-
-	idx_t GetFileExistsCount() const;
-	void ResetFileExistsCount();
-
-	idx_t GetDirectoryExistsCount() const;
-	void ResetDirectoryExistsCount();
-
-	idx_t GetListFilesCount() const;
-	void ResetListFilesCount();
-
-	idx_t GetGlobCount() const;
-	void ResetGlobCount();
-
-	idx_t GetFileSizeCount() const;
-	void ResetFileSizeCount();
-
-	idx_t GetLastModifiedTimeCount() const;
-	void ResetLastModifiedTimeCount();
-
-	idx_t GetFileTypeCount() const;
-	void ResetFileTypeCount();
 
 	string GetName() const override;
 
@@ -73,14 +48,6 @@ private:
 
 	mutex delay_mutex;
 	std::chrono::milliseconds delay DUCKDB_GUARDED_BY(delay_mutex);
-	std::atomic<idx_t> open_file_count;
-	std::atomic<idx_t> file_exists_count;
-	std::atomic<idx_t> directory_exists_count;
-	std::atomic<idx_t> list_files_count;
-	std::atomic<idx_t> glob_count;
-	std::atomic<idx_t> get_file_size_count;
-	std::atomic<idx_t> get_last_modified_time_count;
-	std::atomic<idx_t> get_file_type_count;
 };
 
 } // namespace duckdb
