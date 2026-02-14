@@ -1,6 +1,7 @@
 #pragma once
 
 #include "duckdb/common/array.hpp"
+#include "duckdb/common/numeric_utils.hpp"
 
 #include <chrono>
 
@@ -38,12 +39,12 @@ constexpr size_t DEFAULT_MAX_HEDGED_REQUEST_COUNT = 3;
 // Configuration for hedged request thresholds, notice it's different from operation timeouts.
 struct HedgedRequestConfig {
 	// Delay before starting hedged request for each operation (in milliseconds)
-	duckdb::array<std::chrono::milliseconds, static_cast<size_t>(HedgedRequestOperation::COUNT)> delays_ms;
+	duckdb::array<std::chrono::milliseconds, HEDGED_REQUEST_OPERATION_COUNT> delays_ms;
 	// Maximum number of hedged requests to spawn
 	size_t max_hedged_request_count;
 
 	HedgedRequestConfig() : max_hedged_request_count(DEFAULT_MAX_HEDGED_REQUEST_COUNT) {
-		for (size_t idx = 0; idx < static_cast<size_t>(HedgedRequestOperation::COUNT); ++idx) {
+		for (size_t idx = 0; idx < NumericCast<size_t>(HedgedRequestOperation::COUNT); ++idx) {
 			delays_ms[idx] = std::chrono::milliseconds(DEFAULT_HEDGING_DELAYS_MS[idx]);
 		}
 	}
