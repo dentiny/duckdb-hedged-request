@@ -23,19 +23,19 @@ struct Token {
 template <typename T>
 class FutureWrapper {
 public:
-	FutureWrapper(std::function<T()> functor, shared_ptr<Token> token_p = nullptr) : token(std::move(token_p)) {
+	FutureWrapper(std::function<T()> functor, shared_ptr<Token> token_p) : token(std::move(token_p)) {
 		auto tok = token;
 		future = std::async(std::launch::async, [functor = std::move(functor), tok = std::move(tok)]() {
 			try {
 				auto result = functor();
-				if (tok) {
+				{
 					const lock_guard<mutex> lock(tok->mu);
 					tok->completed = true;
-					tok->cv.notify_all();
 				}
+				tok->cv.notify_all();
 				return result;
 			} catch (...) {
-				if (tok) {
+				{
 					const lock_guard<mutex> lock(tok->mu);
 					tok->completed = true;
 					tok->cv.notify_all();
@@ -89,18 +89,18 @@ private:
 template <>
 class FutureWrapper<void> {
 public:
-	FutureWrapper(std::function<void()> functor, shared_ptr<Token> token_p = nullptr) : token(std::move(token_p)) {
+	FutureWrapper(std::function<void()> functor, shared_ptr<Token> token_p) : token(std::move(token_p)) {
 		auto tok = token;
 		future = std::async(std::launch::async, [functor = std::move(functor), tok = std::move(tok)]() {
 			try {
 				functor();
-				if (tok) {
+				{
 					const lock_guard<mutex> lock(tok->mu);
 					tok->completed = true;
-					tok->cv.notify_all();
 				}
+				tok->cv.notify_all();
 			} catch (...) {
-				if (tok) {
+				{
 					const lock_guard<mutex> lock(tok->mu);
 					tok->completed = true;
 					tok->cv.notify_all();
