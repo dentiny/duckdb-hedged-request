@@ -11,6 +11,11 @@ HedgedRequestFsEntry::~HedgedRequestFsEntry() {
 	WaitAll();
 }
 
+optional_idx HedgedRequestFsEntry::GetEstimatedCacheMemory() const {
+	// Fs entry is used to record all extension related configs and states, cannot be evicted.
+	return optional_idx {};
+}
+
 void HedgedRequestFsEntry::AddPendingRequest(std::function<void()> functor) {
 	auto token = make_shared_ptr<Token>();
 	FutureWrapper<void> future(std::move(functor), token);
