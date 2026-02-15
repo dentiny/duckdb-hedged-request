@@ -14,6 +14,8 @@ public:
 	HedgedRequestFsEntry();
 	~HedgedRequestFsEntry() override;
 
+	optional_idx GetEstimatedCacheMemory() const override;
+
 	string GetObjectType() override {
 		return "hedged_request_fs_entry";
 	}
