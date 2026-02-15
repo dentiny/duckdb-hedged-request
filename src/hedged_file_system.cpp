@@ -350,6 +350,18 @@ FileType HedgedFileSystem::GetFileType(FileHandle &handle) {
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GET_FILE_TYPE)], entry);
 }
 
+FileMetadata HedgedFileSystem::Stats(FileHandle &handle) {
+	auto &hedged_handle = handle.Cast<HedgedFileHandle>();
+	auto *fs_ptr = wrapped_fs.get();
+	auto wrapped_handle_ptr = hedged_handle.GetWrappedHandlePtr();
+	auto config = entry->GetConfig();
+	return HedgedRequest<FileMetadata>(
+	    std::function<FileMetadata()>(
+	        // Capture shared pointer to make sure it's always valid on access.
+	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->Stats(*wrapped_handle_ptr); }),
+	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GET_STATS)], entry);
+}
+
 //===--------------------------------------------------------------------===//
 // HedgedFileHandle
 //===--------------------------------------------------------------------===//

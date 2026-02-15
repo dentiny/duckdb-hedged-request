@@ -259,6 +259,27 @@ TEST_CASE("HedgedFileSystem GetFileType with slow operation", "[hedged_file_syst
 	entry->WaitAll();
 }
 
+TEST_CASE("HedgedFileSystem Stats with slow operation", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_stats.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+	REQUIRE(file_handle != nullptr);
+
+	FileMetadata stats = hedged_fs->Stats(*file_handle);
+	REQUIRE(stats.file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
+	REQUIRE(stats.file_type == FileType::FILE_TYPE_REGULAR);
+
+	file_handle->Close();
+	entry->WaitAll();
+}
+
 TEST_CASE("HedgedFileSystem GetFileSize with early file handle destruction", "[hedged_file_system]") {
 	string test_file = TestCreatePath("hedged_test_size_destruct.txt");
 	CreateTestFile(test_file, TEST_CONTENT);
@@ -329,6 +350,33 @@ TEST_CASE("HedgedFileSystem GetVersionTag with early file handle destruction", "
 
 	// Wait for all pending hedged requests to complete
 	entry->WaitAll();
+	REQUIRE(!version_tag.empty());
+}
+
+TEST_CASE("HedgedFileSystem Stats with early file handle destruction", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_stats_destruct.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	FileMetadata stats;
+	{
+		// Destroy file handle before hedged requests complete
+		auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, nullptr);
+		REQUIRE(file_handle != nullptr);
+		stats = hedged_fs->Stats(*file_handle);
+		REQUIRE(stats.file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
+		REQUIRE(stats.file_type == FileType::FILE_TYPE_REGULAR);
+	}
+
+	// Wait for all pending hedged requests to complete
+	entry->WaitAll();
+	REQUIRE(stats.file_size == NumericCast<int64_t>(TEST_CONTENT.size()));
+	REQUIRE(stats.file_type == FileType::FILE_TYPE_REGULAR);
 }
 
 TEST_CASE("HedgedFileSystem GetFileType with early file handle destruction", "[hedged_file_system]") {

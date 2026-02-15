@@ -17,6 +17,7 @@ enum class HedgedRequestOperation : size_t {
 	GET_FILE_TYPE = 6,
 	GET_VERSION_TAG = 7,
 	LIST_FILES = 8,
+	GET_STATS = 9,
 	COUNT
 };
 
@@ -30,7 +31,8 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     3000, // GET_LAST_MODIFIED_TIME
     3000, // GET_FILE_TYPE
     3000, // GET_VERSION_TAG
-    5000  // LIST_FILES
+    5000, // LIST_FILES
+    3000  // GET_STATS
 };
 
 // Default maximum number of hedged requests to spawn

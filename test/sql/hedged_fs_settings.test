@@ -13,6 +13,7 @@ hedged_fs_file_exists_delay_ms	3000
 hedged_fs_get_file_size_delay_ms	3000
 hedged_fs_get_file_type_delay_ms	3000
 hedged_fs_get_last_modified_time_delay_ms	3000
+hedged_fs_get_stats_delay_ms	3000
 hedged_fs_get_version_tag_delay_ms	3000
 hedged_fs_glob_delay_ms	5000
 hedged_fs_list_files_delay_ms	5000
