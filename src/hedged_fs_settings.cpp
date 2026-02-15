@@ -70,6 +70,11 @@ void SetListFilesHedgingDelay(ClientContext &context, SetScope scope, Value &par
 	UpdateConfigDelay(context, scope, "hedged_fs_list_files_delay_ms", HedgedRequestOperation::LIST_FILES, value_ms);
 }
 
+void SetGetStatsHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
+	auto value_ms = parameter.GetValue<uint64_t>();
+	UpdateConfigDelay(context, scope, "hedged_fs_get_stats_delay_ms", HedgedRequestOperation::GET_STATS, value_ms);
+}
+
 void SetMaxHedgedRequestCount(ClientContext &context, SetScope scope, Value &parameter) {
 	auto max_count = parameter.GetValue<uint64_t>();
 	auto &db = DatabaseInstance::GetDatabase(context);
@@ -136,6 +141,12 @@ void RegisterHedgedFsSettings(DatabaseInstance &db) {
 	    LogicalType::UBIGINT,
 	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[NumericCast<size_t>(HedgedRequestOperation::LIST_FILES)]),
 	    SetListFilesHedgingDelay);
+
+	config.AddExtensionOption(
+	    "hedged_fs_get_stats_delay_ms", "Delay in milliseconds before starting hedged request for Stats operation",
+	    LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[NumericCast<size_t>(HedgedRequestOperation::GET_STATS)]),
+	    SetGetStatsHedgingDelay);
 
 	config.AddExtensionOption("hedged_fs_max_hedged_request_count",
 	                          "Maximum number of hedged requests to spawn for each operation", LogicalType::UBIGINT,
