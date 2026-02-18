@@ -241,6 +241,9 @@ unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFl
 		    return fs_ptr->OpenFile(path_copy, flags, opener_copy.get());
 	    }),
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::OPEN_FILE)], entry);
+	if (!result) {
+		return nullptr;
+	}
 	return make_uniq<HedgedFileHandle>(*this, std::move(result), path);
 }
 
