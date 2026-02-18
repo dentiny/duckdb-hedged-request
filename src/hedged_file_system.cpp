@@ -369,10 +369,10 @@ FileMetadata HedgedFileSystem::Stats(FileHandle &handle) {
 // HedgedFileHandle
 //===--------------------------------------------------------------------===//
 
-HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle_param,
+HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle,
                                    const string &path)
-    : FileHandle(fs, path, wrapped_handle_param->GetFlags()), hedged_fs(fs),
-      wrapped_handle(wrapped_handle_param.release(), [](FileHandle *handle) {
+    : FileHandle(fs, path, wrapped_handle->GetFlags()), hedged_fs(fs),
+      wrapped_handle(wrapped_handle.release(), [](FileHandle *handle) {
 	      if (handle) {
 		      handle->Close();
 		      delete handle;
