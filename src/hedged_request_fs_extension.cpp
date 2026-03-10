@@ -27,6 +27,10 @@ void LoadInternal(ExtensionLoader &loader) {
 	auto &opener_fs = db.GetFileSystem().Cast<OpenerFileSystem>();
 	auto &vfs = opener_fs.GetFileSystem();
 	vfs.RegisterSubSystem(make_uniq<MockFileSystem>());
+
+	// Add extension description.
+	loader.SetDescription(
+	    "Extention to wrap filesystems and perform hedged requests to reduce tail latency for slow I/O operations.");
 }
 } // namespace
 
