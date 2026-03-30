@@ -1,6 +1,8 @@
 #include "hedged_file_system.hpp"
 
+#include "duckdb/common/enums/file_glob_options.hpp"
 #include "duckdb/common/exception.hpp"
+#include "duckdb/common/multi_file/multi_file_list.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/common/numeric_utils.hpp"
 #include "duckdb/common/unique_ptr.hpp"
@@ -300,8 +302,10 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 	auto opener_copy = CopyFileOpener(opener);
 	auto config = entry->GetConfig();
 	return HedgedRequest<vector<OpenFileInfo>>(
-	    std::function<vector<OpenFileInfo>()>(
-	        [fs_ptr, path_copy = path, opener_copy]() { return fs_ptr->Glob(path_copy, opener_copy.get()); }),
+	    std::function<vector<OpenFileInfo>()>([fs_ptr, path_copy = path, opener_copy]() {
+		    auto result = fs_ptr->Glob(path_copy, FileGlobOptions::ALLOW_EMPTY, opener_copy.get());
+		    return result->GetAllFiles();
+	    }),
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GLOB)], entry);
 }
 
