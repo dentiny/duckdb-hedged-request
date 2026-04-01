@@ -140,6 +140,10 @@ void HedgedFileSystem::CreateDirectory(const string &directory, optional_ptr<Fil
 	wrapped_fs->CreateDirectory(directory, opener);
 }
 
+void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_ptr<FileOpener> opener) {
+	wrapped_fs->CreateDirectoriesRecursive(path, opener);
+}
+
 void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
 	wrapped_fs->RemoveDirectory(directory, opener);
 }
@@ -158,6 +162,10 @@ void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpene
 
 bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
 	return wrapped_fs->TryRemoveFile(filename, opener);
+}
+
+void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
+	wrapped_fs->RemoveFiles(filenames, opener);
 }
 
 void HedgedFileSystem::FileSync(FileHandle &handle) {
