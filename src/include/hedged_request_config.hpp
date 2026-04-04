@@ -19,6 +19,7 @@ enum class HedgedRequestOperation : size_t {
 	LIST_FILES = 8,
 	GET_STATS = 9,
 	FILE_DELETE = 10,
+	DIRECTORY_CREATE = 11,
 	COUNT
 };
 
@@ -34,7 +35,8 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     3000, // GET_VERSION_TAG
     5000, // LIST_FILES
     3000, // GET_STATS
-    3000  // FILE_DELETE
+    3000, // FILE_DELETE
+    3000  // DIRECTORY_CREATE (CreateDirectory, CreateDirectoriesRecursive)
 };
 
 // Default maximum number of hedged requests to spawn

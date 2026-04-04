@@ -52,6 +52,16 @@ bool MockFileSystem::FileExists(const string &filename, optional_ptr<FileOpener>
 	return LocalFileSystem::FileExists(filename, opener);
 }
 
+void MockFileSystem::CreateDirectory(const string &directory, optional_ptr<FileOpener> opener) {
+	SimulateDelay();
+	LocalFileSystem::CreateDirectory(directory, opener);
+}
+
+void MockFileSystem::CreateDirectoriesRecursive(const string &path, optional_ptr<FileOpener> opener) {
+	SimulateDelay();
+	LocalFileSystem::CreateDirectoriesRecursive(path, opener);
+}
+
 void MockFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
 	SimulateDelay();
 	LocalFileSystem::RemoveFile(filename, opener);
