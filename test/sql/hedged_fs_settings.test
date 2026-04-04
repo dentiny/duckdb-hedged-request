@@ -8,6 +8,7 @@ require hedged_request_fs
 query IT
 SELECT name, value FROM duckdb_settings() WHERE name LIKE 'hedged_fs_%' ORDER BY name;
 ----
+hedged_fs_delete_delay_ms	3000
 hedged_fs_directory_exists_delay_ms	3000
 hedged_fs_file_exists_delay_ms	3000
 hedged_fs_get_file_size_delay_ms	3000

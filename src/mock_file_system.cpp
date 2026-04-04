@@ -52,6 +52,11 @@ bool MockFileSystem::FileExists(const string &filename, optional_ptr<FileOpener>
 	return LocalFileSystem::FileExists(filename, opener);
 }
 
+void MockFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
+	SimulateDelay();
+	LocalFileSystem::RemoveFile(filename, opener);
+}
+
 vector<OpenFileInfo> MockFileSystem::Glob(const string &path, FileOpener *opener) {
 	SimulateDelay();
 	return LocalFileSystem::Glob(path, opener);

@@ -17,42 +17,43 @@ public:
 	HedgedFileSystem(unique_ptr<FileSystem> wrapped_fs, shared_ptr<HedgedRequestFsEntry> entry_p);
 	~HedgedFileSystem() override;
 
+	// Hedged request operations
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
 	                                optional_ptr<FileOpener> opener = nullptr) override;
 
-	int64_t Read(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
-	void Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+	bool FileExists(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
+	               FileOpener *opener = nullptr) override;
+	vector<OpenFileInfo> Glob(const string &path, FileOpener *opener = nullptr) override;
 
-	// All other methods delegate to the wrapped filesystem
-	void Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
-	int64_t Write(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
-	bool Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_bytes) override;
 	int64_t GetFileSize(FileHandle &handle) override;
 	timestamp_t GetLastModifiedTime(FileHandle &handle) override;
 	string GetVersionTag(FileHandle &handle) override;
 	FileType GetFileType(FileHandle &handle) override;
 	FileMetadata Stats(FileHandle &handle) override;
-	void Truncate(FileHandle &handle, int64_t new_size) override;
 
-	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
-	void CreateDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
-	void RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
-
-	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
-	               FileOpener *opener = nullptr) override;
-
-	void MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener = nullptr) override;
-	bool FileExists(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
-	bool IsPipe(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
 	void RemoveFile(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
 	bool TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+	void RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+
+	// Delegate to wrapped filesystem
+	int64_t Read(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+	void Read(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	void Write(FileHandle &handle, void *buffer, int64_t nr_bytes, idx_t location) override;
+	int64_t Write(FileHandle &handle, void *buffer, int64_t nr_bytes) override;
+	bool Trim(FileHandle &handle, idx_t offset_bytes, idx_t length_bytes) override;
+	void Truncate(FileHandle &handle, int64_t new_size) override;
+
+	void CreateDirectory(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
+	void MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener = nullptr) override;
+	bool IsPipe(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
 	void FileSync(FileHandle &handle) override;
 
 	string GetHomeDirectory() override;
 	string ExpandPath(const string &path) override;
 	string PathSeparator(const string &path) override;
 
-	vector<OpenFileInfo> Glob(const string &path, FileOpener *opener = nullptr) override;
 	string GetName() const override;
 
 	void RegisterSubSystem(unique_ptr<FileSystem> sub_fs) override;

@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <thread>
 
 namespace duckdb {
 
@@ -157,6 +158,11 @@ struct WaitResult {
 	T result;
 };
 
+template <>
+struct WaitResult<void> {
+	vector<FutureWrapper<void>> pending_futures;
+};
+
 // Wait until any of the futures completes.
 // Returns a WaitResult containing the result of the first completed future and pending futures.
 template <typename T>
@@ -171,6 +177,26 @@ WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token)
 	for (auto &fut : futs) {
 		if (!got_result && fut.IsReady()) {
 			result.result = fut.Get();
+			got_result = true;
+		} else {
+			result.pending_futures.emplace_back(std::move(fut));
+		}
+	}
+	return result;
+}
+
+template <>
+inline WaitResult<void> WaitForAny(vector<FutureWrapper<void>> futs, shared_ptr<Token> token) {
+	{
+		unique_lock<mutex> lock(token->mu);
+		token->cv.wait(lock, [&] { return token->completed; });
+	}
+
+	WaitResult<void> result;
+	bool got_result = false;
+	for (auto &fut : futs) {
+		if (!got_result && fut.IsReady()) {
+			fut.Get();
 			got_result = true;
 		} else {
 			result.pending_futures.emplace_back(std::move(fut));

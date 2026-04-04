@@ -29,6 +29,8 @@ public:
 	bool DirectoryExists(const string &directory, optional_ptr<FileOpener> opener = nullptr) override;
 	bool FileExists(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
 
+	void RemoveFile(const string &filename, optional_ptr<FileOpener> opener = nullptr) override;
+
 	vector<OpenFileInfo> Glob(const string &path, FileOpener *opener = nullptr) override;
 
 	bool ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
