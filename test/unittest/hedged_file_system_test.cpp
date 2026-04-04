@@ -2,6 +2,7 @@
 
 #include "duckdb/common/array.hpp"
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/common/local_file_system.hpp"
 #include "duckdb/common/virtual_file_system.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/client_data.hpp"
@@ -402,6 +403,23 @@ TEST_CASE("HedgedFileSystem GetFileType with early file handle destruction", "[h
 	// Wait for all pending hedged requests to complete
 	entry->WaitAll();
 	REQUIRE(file_type == FileType::FILE_TYPE_REGULAR);
+}
+
+TEST_CASE("HedgedFileSystem RemoveFile with slow operation", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_remove.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(100));
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	hedged_fs->RemoveFile(test_file, nullptr);
+
+	LocalFileSystem verify_fs;
+	REQUIRE(!verify_fs.FileExists(test_file, nullptr));
+	entry->WaitAll();
 }
 
 // Testing scenario: if operation timeout is far shorter than the delay, multiple hedged requests should be spawned.

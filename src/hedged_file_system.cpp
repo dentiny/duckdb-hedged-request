@@ -14,6 +14,8 @@
 #include "hedged_request_config.hpp"
 #include "thread_annotation.hpp"
 
+#include <type_traits>
+
 namespace duckdb {
 
 namespace {
@@ -46,8 +48,9 @@ bool HasAnyReady(const vector<FutureWrapper<T>> &futs) {
 }
 
 template <typename T>
-T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_delay,
-                shared_ptr<HedgedRequestFsEntry> entry) {
+typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::function<T()> fn,
+                                                                        std::chrono::milliseconds hedged_request_delay,
+                                                                        shared_ptr<HedgedRequestFsEntry> entry) {
 	auto token = make_shared_ptr<Token>();
 	using FutureType = FutureWrapper<T>;
 
@@ -86,6 +89,42 @@ T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_
 	}
 
 	return std::move(wait_result.result);
+}
+
+void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_request_delay,
+                   shared_ptr<HedgedRequestFsEntry> entry) {
+	auto token = make_shared_ptr<Token>();
+	using FutureType = FutureWrapper<void>;
+
+	FutureType primary {fn, token};
+	vector<FutureType> futs;
+	futs.emplace_back(std::move(primary));
+
+	auto config = entry->GetConfig();
+
+	while (true) {
+		{
+			unique_lock<mutex> lock(token->mu);
+			token->cv.wait_for(lock, hedged_request_delay,
+			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
+			if (token->completed) {
+				break;
+			}
+		}
+
+		if (futs.size() >= config.max_hedged_request_count) {
+			continue;
+		}
+
+		FutureType hedged(fn, token);
+		futs.emplace_back(std::move(hedged));
+	}
+
+	auto wait_result = WaitForAny(std::move(futs), token);
+	for (auto &fut : wait_result.pending_futures) {
+		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
+		entry->AddPendingRequest([pending_fut = std::move(pending_fut)]() { pending_fut->Wait(); });
+	}
 }
 } // namespace
 
@@ -144,28 +183,12 @@ void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_p
 	wrapped_fs->CreateDirectoriesRecursive(path, opener);
 }
 
-void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveDirectory(directory, opener);
-}
-
 void HedgedFileSystem::MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener) {
 	wrapped_fs->MoveFile(source, target, opener);
 }
 
 bool HedgedFileSystem::IsPipe(const string &filename, optional_ptr<FileOpener> opener) {
 	return wrapped_fs->IsPipe(filename, opener);
-}
-
-void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveFile(filename, opener);
-}
-
-bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
-	return wrapped_fs->TryRemoveFile(filename, opener);
-}
-
-void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveFiles(filenames, opener);
 }
 
 void HedgedFileSystem::FileSync(FileHandle &handle) {
@@ -267,6 +290,16 @@ bool HedgedFileSystem::DirectoryExists(const string &directory, optional_ptr<Fil
 	                           config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::DIRECTORY_EXISTS)], entry);
 }
 
+bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, filename_copy = filename, opener_copy]() {
+		                           return fs_ptr->FileExists(filename_copy, opener_copy.get());
+	                           }),
+	                           config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_EXISTS)], entry);
+}
+
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
                                  FileOpener *opener) {
 	auto results = make_shared_ptr<vector<std::pair<string, bool>>>();
@@ -293,16 +326,6 @@ bool HedgedFileSystem::ListFiles(const string &directory, const std::function<vo
 		}
 	}
 	return success;
-}
-
-bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpener> opener) {
-	auto *fs_ptr = wrapped_fs.get();
-	auto opener_copy = CopyFileOpener(opener);
-	auto config = entry->GetConfig();
-	return HedgedRequest<bool>(std::function<bool()>([fs_ptr, filename_copy = filename, opener_copy]() {
-		                           return fs_ptr->FileExists(filename_copy, opener_copy.get());
-	                           }),
-	                           config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_EXISTS)], entry);
 }
 
 vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *opener) {
@@ -375,6 +398,48 @@ FileMetadata HedgedFileSystem::Stats(FileHandle &handle) {
 	        // Capture shared pointer to make sure it's always valid on access.
 	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->Stats(*wrapped_handle_ptr); }),
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GET_STATS)], entry);
+}
+
+void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, filename_copy = filename, opener_copy]() {
+		              fs_ptr->RemoveFile(filename_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
+}
+
+bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	auto removed =
+	    HedgedRequest<bool>(std::function<bool()>([fs_ptr, filename_copy = filename, opener_copy]() {
+		                        return fs_ptr->TryRemoveFile(filename_copy, opener_copy.get());
+	                        }),
+	                        config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
+	return removed;
+}
+
+void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, filenames_copy = filenames, opener_copy]() {
+		              fs_ptr->RemoveFiles(filenames_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
+}
+
+void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, directory_copy = directory, opener_copy]() {
+		              fs_ptr->RemoveDirectory(directory_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
 }
 
 //===--------------------------------------------------------------------===//
