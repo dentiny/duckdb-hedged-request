@@ -7,21 +7,17 @@
 
 namespace duckdb {
 
-// One value per hedged FileSystem API; indexes delays_ms / hedged_fs_*_delay_ms settings.
 enum class HedgedRequestOperation : size_t {
-	// Path open, listing, existence
 	OPEN_FILE = 0,
 	GLOB = 1,
 	FILE_EXISTS = 2,
 	DIRECTORY_EXISTS = 3,
-	// Metadata on an open handle
 	GET_FILE_SIZE = 4,
 	GET_LAST_MODIFIED_TIME = 5,
 	GET_FILE_TYPE = 6,
 	GET_VERSION_TAG = 7,
 	LIST_FILES = 8,
 	GET_STATS = 9,
-	// RemoveFile, TryRemoveFile, RemoveDirectory
 	FILE_DELETE = 10,
 	COUNT
 };
@@ -38,7 +34,7 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     3000, // GET_VERSION_TAG
     5000, // LIST_FILES
     3000, // GET_STATS
-    3000  // FILE_DELETE (RemoveFile, TryRemoveFile, RemoveDirectory)
+    3000  // FILE_DELETE
 };
 
 // Default maximum number of hedged requests to spawn

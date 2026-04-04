@@ -261,7 +261,7 @@ bool HedgedFileSystem::OnDiskFile(FileHandle &handle) {
 }
 
 //===--------------------------------------------------------------------===//
-// Hedged request operations (see HedgedRequestOperation; all other methods delegate)
+// Hedged Request Operations
 //===--------------------------------------------------------------------===//
 
 unique_ptr<FileHandle> HedgedFileSystem::OpenFile(const string &path, FileOpenFlags flags,
@@ -408,9 +408,6 @@ void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpene
 		              fs_ptr->RemoveFile(filename_copy, opener_copy.get());
 	              }),
 	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
-	if (fs_ptr->FileExists(filename, opener_copy.get())) {
-		throw IOException("Failed to remove file \"%s\"", filename);
-	}
 }
 
 bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
@@ -422,9 +419,6 @@ bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOp
 		                        return fs_ptr->TryRemoveFile(filename_copy, opener_copy.get());
 	                        }),
 	                        config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
-	if (!removed && fs_ptr->FileExists(filename, opener_copy.get())) {
-		throw IOException("Failed to remove file \"%s\"", filename);
-	}
 	return removed;
 }
 
@@ -446,9 +440,6 @@ void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<Fil
 		              fs_ptr->RemoveDirectory(directory_copy, opener_copy.get());
 	              }),
 	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
-	if (fs_ptr->DirectoryExists(directory, opener_copy.get())) {
-		throw IOException("Failed to remove directory \"%s\"", directory);
-	}
 }
 
 //===--------------------------------------------------------------------===//
