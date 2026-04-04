@@ -183,28 +183,12 @@ void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_p
 	wrapped_fs->CreateDirectoriesRecursive(path, opener);
 }
 
-void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveDirectory(directory, opener);
-}
-
 void HedgedFileSystem::MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener) {
 	wrapped_fs->MoveFile(source, target, opener);
 }
 
 bool HedgedFileSystem::IsPipe(const string &filename, optional_ptr<FileOpener> opener) {
 	return wrapped_fs->IsPipe(filename, opener);
-}
-
-void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveFile(filename, opener);
-}
-
-bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
-	return wrapped_fs->TryRemoveFile(filename, opener);
-}
-
-void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
-	wrapped_fs->RemoveFiles(filenames, opener);
 }
 
 void HedgedFileSystem::FileSync(FileHandle &handle) {
@@ -442,6 +426,16 @@ bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOp
 		throw IOException("Failed to remove file \"%s\"", filename);
 	}
 	return removed;
+}
+
+void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, filenames_copy = filenames, opener_copy]() {
+		              fs_ptr->RemoveFiles(filenames_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)], entry);
 }
 
 void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
