@@ -1,6 +1,8 @@
 #include "hedged_file_system.hpp"
 
+#include "duckdb/common/enums/file_glob_options.hpp"
 #include "duckdb/common/exception.hpp"
+#include "duckdb/common/multi_file/multi_file_list.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/common/numeric_utils.hpp"
 #include "duckdb/common/unique_ptr.hpp"
@@ -177,12 +179,32 @@ void HedgedFileSystem::CreateDirectory(const string &directory, optional_ptr<Fil
 	wrapped_fs->CreateDirectory(directory, opener);
 }
 
+void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_ptr<FileOpener> opener) {
+	wrapped_fs->CreateDirectoriesRecursive(path, opener);
+}
+
+void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<FileOpener> opener) {
+	wrapped_fs->RemoveDirectory(directory, opener);
+}
+
 void HedgedFileSystem::MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener) {
 	wrapped_fs->MoveFile(source, target, opener);
 }
 
 bool HedgedFileSystem::IsPipe(const string &filename, optional_ptr<FileOpener> opener) {
 	return wrapped_fs->IsPipe(filename, opener);
+}
+
+void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
+	wrapped_fs->RemoveFile(filename, opener);
+}
+
+bool HedgedFileSystem::TryRemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
+	return wrapped_fs->TryRemoveFile(filename, opener);
+}
+
+void HedgedFileSystem::RemoveFiles(const vector<string> &filenames, optional_ptr<FileOpener> opener) {
+	wrapped_fs->RemoveFiles(filenames, opener);
 }
 
 void HedgedFileSystem::FileSync(FileHandle &handle) {
@@ -327,8 +349,10 @@ vector<OpenFileInfo> HedgedFileSystem::Glob(const string &path, FileOpener *open
 	auto opener_copy = CopyFileOpener(opener);
 	auto config = entry->GetConfig();
 	return HedgedRequest<vector<OpenFileInfo>>(
-	    std::function<vector<OpenFileInfo>()>(
-	        [fs_ptr, path_copy = path, opener_copy]() { return fs_ptr->Glob(path_copy, opener_copy.get()); }),
+	    std::function<vector<OpenFileInfo>()>([fs_ptr, path_copy = path, opener_copy]() {
+		    auto result = fs_ptr->Glob(path_copy, FileGlobOptions::ALLOW_EMPTY, opener_copy.get());
+		    return result->GetAllFiles();
+	    }),
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GLOB)], entry);
 }
 
