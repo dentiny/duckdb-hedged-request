@@ -1,6 +1,7 @@
 #include "catch/catch.hpp"
 
 #include "duckdb/common/array.hpp"
+#include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/local_file_system.hpp"
 #include "duckdb/common/virtual_file_system.hpp"
@@ -459,6 +460,32 @@ TEST_CASE("HedgedFileSystem RemoveFile with slow operation", "[hedged_file_syste
 	LocalFileSystem verify_fs;
 	REQUIRE(!verify_fs.FileExists(test_file, /*opener=*/nullptr));
 	entry->WaitAll();
+}
+
+TEST_CASE("HedgedFileSystem propagates IOException from wrapped FileExists", "[hedged_file_system]") {
+	string path = TestCreatePath("hedged_test_io_fail.txt");
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(10));
+	mock_fs->SetSimulateIoFailure(true);
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	REQUIRE_THROWS_AS(hedged_fs->FileExists(path, /*opener=*/nullptr), IOException);
+}
+
+TEST_CASE("HedgedFileSystem propagates IOException from wrapped OpenFile", "[hedged_file_system]") {
+	string path = TestCreatePath("hedged_test_open_io_fail.txt");
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(10));
+	mock_fs->SetSimulateIoFailure(true);
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	REQUIRE_THROWS_AS(hedged_fs->OpenFile(path, FileFlags::FILE_FLAGS_READ, /*opener=*/nullptr), IOException);
 }
 
 // Testing scenario: if operation timeout is far shorter than the delay, multiple hedged requests should be spawned.
