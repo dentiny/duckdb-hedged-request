@@ -80,6 +80,12 @@ void SetDeleteHedgingDelay(ClientContext &context, SetScope scope, Value &parame
 	UpdateConfigDelay(context, scope, "hedged_fs_delete_delay_ms", HedgedRequestOperation::FILE_DELETE, value_ms);
 }
 
+void SetDirectoryCreateHedgingDelay(ClientContext &context, SetScope scope, Value &parameter) {
+	auto value_ms = parameter.GetValue<uint64_t>();
+	UpdateConfigDelay(context, scope, "hedged_fs_create_directory_delay_ms", HedgedRequestOperation::DIRECTORY_CREATE,
+	                  value_ms);
+}
+
 void SetMaxHedgedRequestCount(ClientContext &context, SetScope scope, Value &parameter) {
 	auto max_count = parameter.GetValue<uint64_t>();
 	auto &db = DatabaseInstance::GetDatabase(context);
@@ -159,6 +165,13 @@ void RegisterHedgedFsSettings(DatabaseInstance &db) {
 	    LogicalType::UBIGINT,
 	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[NumericCast<size_t>(HedgedRequestOperation::FILE_DELETE)]),
 	    SetDeleteHedgingDelay);
+
+	config.AddExtensionOption(
+	    "hedged_fs_create_directory_delay_ms",
+	    "Delay in milliseconds before starting hedged request for CreateDirectory and CreateDirectoriesRecursive",
+	    LogicalType::UBIGINT,
+	    Value::UBIGINT(DEFAULT_HEDGING_DELAYS_MS[NumericCast<size_t>(HedgedRequestOperation::DIRECTORY_CREATE)]),
+	    SetDirectoryCreateHedgingDelay);
 
 	config.AddExtensionOption("hedged_fs_max_hedged_request_count",
 	                          "Maximum number of hedged requests to spawn for each operation", LogicalType::UBIGINT,

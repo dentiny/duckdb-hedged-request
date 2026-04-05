@@ -175,14 +175,6 @@ void HedgedFileSystem::Truncate(FileHandle &handle, int64_t new_size) {
 	wrapped_fs->Truncate(hedged_handle.GetWrappedHandle(), new_size);
 }
 
-void HedgedFileSystem::CreateDirectory(const string &directory, optional_ptr<FileOpener> opener) {
-	wrapped_fs->CreateDirectory(directory, opener);
-}
-
-void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_ptr<FileOpener> opener) {
-	wrapped_fs->CreateDirectoriesRecursive(path, opener);
-}
-
 void HedgedFileSystem::MoveFile(const string &source, const string &target, optional_ptr<FileOpener> opener) {
 	wrapped_fs->MoveFile(source, target, opener);
 }
@@ -398,6 +390,26 @@ FileMetadata HedgedFileSystem::Stats(FileHandle &handle) {
 	        // Capture shared pointer to make sure it's always valid on access.
 	        [fs_ptr, wrapped_handle_ptr]() { return fs_ptr->Stats(*wrapped_handle_ptr); }),
 	    config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::GET_STATS)], entry);
+}
+
+void HedgedFileSystem::CreateDirectory(const string &directory, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, directory_copy = directory, opener_copy]() {
+		              fs_ptr->CreateDirectory(directory_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::DIRECTORY_CREATE)], entry);
+}
+
+void HedgedFileSystem::CreateDirectoriesRecursive(const string &path, optional_ptr<FileOpener> opener) {
+	auto *fs_ptr = wrapped_fs.get();
+	auto opener_copy = CopyFileOpener(opener);
+	auto config = entry->GetConfig();
+	HedgedRequest(std::function<void()>([fs_ptr, path_copy = path, opener_copy]() {
+		              fs_ptr->CreateDirectoriesRecursive(path_copy, opener_copy.get());
+	              }),
+	              config.delays_ms[NumericCast<size_t>(HedgedRequestOperation::DIRECTORY_CREATE)], entry);
 }
 
 void HedgedFileSystem::RemoveFile(const string &filename, optional_ptr<FileOpener> opener) {
