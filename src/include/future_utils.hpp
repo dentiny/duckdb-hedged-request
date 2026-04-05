@@ -1,8 +1,8 @@
 #pragma once
 
 #include "duckdb/common/helper.hpp"
-#include "duckdb/common/mutex.hpp"
 #include "duckdb/common/shared_ptr.hpp"
+#include "mutex.hpp"
 #include "duckdb/common/vector.hpp"
 #include "thread_annotation.hpp"
 
@@ -15,7 +15,7 @@ namespace duckdb {
 // Token used to signal completion across multiple FutureWrappers.
 struct Token {
 	bool completed DUCKDB_GUARDED_BY(mu) = false;
-	mutex mu;
+	concurrency::mutex mu;
 	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
 };
 
@@ -30,14 +30,14 @@ public:
 			try {
 				auto result = functor();
 				{
-					const lock_guard<mutex> lock(tok->mu);
+					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
 					tok->completed = true;
+					tok->cv.notify_all();
 				}
-				tok->cv.notify_all();
 				return result;
 			} catch (...) {
 				{
-					const lock_guard<mutex> lock(tok->mu);
+					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
 					tok->completed = true;
 					tok->cv.notify_all();
 				}
@@ -96,13 +96,13 @@ public:
 			try {
 				functor();
 				{
-					const lock_guard<mutex> lock(tok->mu);
+					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
 					tok->completed = true;
+					tok->cv.notify_all();
 				}
-				tok->cv.notify_all();
 			} catch (...) {
 				{
-					const lock_guard<mutex> lock(tok->mu);
+					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
 					tok->completed = true;
 					tok->cv.notify_all();
 				}
@@ -167,8 +167,8 @@ struct WaitResult<void> {
 template <typename T>
 WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token) {
 	{
-		unique_lock<mutex> lock(token->mu);
-		token->cv.wait(lock, [&] { return token->completed; });
+		concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+		token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 	}
 
 	WaitResult<T> result;
@@ -187,8 +187,8 @@ WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token)
 template <>
 inline WaitResult<void> WaitForAny(vector<FutureWrapper<void>> futs, shared_ptr<Token> token) {
 	{
-		unique_lock<mutex> lock(token->mu);
-		token->cv.wait(lock, [&] { return token->completed; });
+		concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+		token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 	}
 
 	WaitResult<void> result;

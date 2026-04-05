@@ -1,3 +1,6 @@
+// Define ghost specific thread safety attributes for clang.
+// See: https://clang.llvm.org/docs/ThreadSafetyAnalysis.html#reference-guide
+
 #pragma once
 
 #include "internal/thread_annotation.hpp"
