@@ -36,7 +36,7 @@ constexpr duckdb::array<int64_t, static_cast<size_t>(HedgedRequestOperation::COU
     5000, // LIST_FILES
     3000, // GET_STATS
     3000, // FILE_DELETE
-    3000  // DIRECTORY_CREATE (CreateDirectory, CreateDirectoriesRecursive)
+    3000  // DIRECTORY_CREATE
 };
 
 // Default maximum number of hedged requests to spawn
