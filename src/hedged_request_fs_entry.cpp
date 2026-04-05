@@ -2,6 +2,9 @@
 
 #include "duckdb/common/numeric_utils.hpp"
 
+#include <algorithm>
+#include <chrono>
+
 namespace duckdb {
 
 HedgedRequestFsEntry::HedgedRequestFsEntry() {
@@ -17,23 +20,24 @@ optional_idx HedgedRequestFsEntry::GetEstimatedCacheMemory() const {
 }
 
 void HedgedRequestFsEntry::AddPendingRequest(std::function<void()> functor) {
-	auto token = make_shared_ptr<Token>();
-	FutureWrapper<void> future(std::move(functor), token);
+	auto future = thread_pool.Push(std::move(functor));
 	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	pending_requests.push_back(std::move(future));
 	CleanupCompleted();
 }
 
-void HedgedRequestFsEntry::CleanupCompleted() {
+void HedgedRequestFsEntry::CleanupCompleted() DUCKDB_REQUIRES(cache_mutex) {
 	pending_requests.erase(std::remove_if(pending_requests.begin(), pending_requests.end(),
-	                                      [](FutureWrapper<void> &f) { return f.IsReady(); }),
+	                                      [](std::future<void> &f) {
+		                                      return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+	                                      }),
 	                       pending_requests.end());
 }
 
 void HedgedRequestFsEntry::WaitAll() {
 	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	for (auto &future : pending_requests) {
-		future.Wait();
+		future.wait();
 	}
 	pending_requests.clear();
 }

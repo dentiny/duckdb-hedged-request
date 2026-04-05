@@ -19,6 +19,8 @@ public:
 	// After simulated delay, throw IOException.
 	void SetSimulateIoFailure(bool failure);
 
+	void SetSkipSimulatedIoFailureCalls(int count);
+
 	string GetName() const override;
 
 	unique_ptr<FileHandle> OpenFile(const string &path, FileOpenFlags flags,
@@ -57,6 +59,7 @@ private:
 	concurrency::mutex delay_mutex;
 	std::chrono::milliseconds delay DUCKDB_GUARDED_BY(delay_mutex);
 	bool simulate_io_failure DUCKDB_GUARDED_BY(delay_mutex) = false;
+	int skip_simulated_io_failure_calls DUCKDB_GUARDED_BY(delay_mutex) = 0;
 };
 
 } // namespace duckdb

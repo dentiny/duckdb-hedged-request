@@ -2,9 +2,11 @@
 
 #include "duckdb/common/vector.hpp"
 #include "duckdb/storage/object_cache.hpp"
-#include "future_utils.hpp"
 #include "hedged_request_config.hpp"
 #include "thread_annotation.hpp"
+#include "thread_pool.hpp"
+
+#include <future>
 
 namespace duckdb {
 
@@ -39,13 +41,19 @@ public:
 	// Update the maximum number of hedged requests to spawn
 	void UpdateMaxHedgedRequestCount(size_t max_count);
 
+	// Per-database thread pool.
+	ThreadPool &GetThreadPool() {
+		return thread_pool;
+	}
+
 private:
 	// Try to clean up completed requests in a non-blocking style.
 	void CleanupCompleted() DUCKDB_REQUIRES(cache_mutex);
 
 	mutable concurrency::mutex cache_mutex;
-	vector<FutureWrapper<void>> pending_requests DUCKDB_GUARDED_BY(cache_mutex);
+	vector<std::future<void>> pending_requests DUCKDB_GUARDED_BY(cache_mutex);
 	HedgedRequestConfig config DUCKDB_GUARDED_BY(cache_mutex);
+	ThreadPool thread_pool;
 };
 
 } // namespace duckdb

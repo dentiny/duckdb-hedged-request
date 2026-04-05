@@ -2,206 +2,92 @@
 
 #include "duckdb/common/helper.hpp"
 #include "duckdb/common/shared_ptr.hpp"
+#include "duckdb/common/unique_ptr.hpp"
 #include "mutex.hpp"
-#include "duckdb/common/vector.hpp"
 #include "thread_annotation.hpp"
 
 #include <condition_variable>
+#include <exception>
 #include <functional>
-#include <future>
 
 namespace duckdb {
 
-// Token used to signal completion across multiple FutureWrappers.
-struct Token {
-	bool completed DUCKDB_GUARDED_BY(mu) = false;
+template <typename T>
+struct HedgedOutcomeToken {
 	concurrency::mutex mu;
 	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
-};
-
-// A wrapper around std::future, which shares a Token among multiple future wrappers.
-// On completion, signals the Token via cv so WaitForAny can wake up.
-template <typename T>
-class FutureWrapper {
-public:
-	FutureWrapper(std::function<T()> functor, shared_ptr<Token> token_p) : token(std::move(token_p)) {
-		auto tok = token;
-		future = std::async(std::launch::async, [functor = std::move(functor), tok = std::move(tok)]() {
-			try {
-				auto result = functor();
-				{
-					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
-					tok->completed = true;
-					tok->cv.notify_all();
-				}
-				return result;
-			} catch (...) {
-				{
-					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
-					tok->completed = true;
-					tok->cv.notify_all();
-				}
-				throw;
-			}
-		});
-	}
-
-	FutureWrapper(const FutureWrapper &) = delete;
-	FutureWrapper &operator=(const FutureWrapper &) = delete;
-
-	FutureWrapper(FutureWrapper &&other) noexcept : token(std::move(other.token)), future(std::move(other.future)) {
-	}
-
-	FutureWrapper &operator=(FutureWrapper &&other) noexcept {
-		if (this != &other) {
-			token = std::move(other.token);
-			future = std::move(other.future);
-		}
-		return *this;
-	}
-
-	~FutureWrapper() {
-		Wait();
-	}
-
-	bool IsReady() const {
-		if (!future.valid()) {
-			return false;
-		}
-		return future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-	}
-
-	// Block until result is available, then return it. Rethrows if the task threw.
-	T Get() {
-		return future.get();
-	}
-
-	void Wait() {
-		if (future.valid()) {
-			future.wait();
-		}
-	}
-
-private:
-	shared_ptr<Token> token;
-	std::future<T> future;
+	bool completed DUCKDB_GUARDED_BY(mu) = false;
+	std::exception_ptr eptr DUCKDB_GUARDED_BY(mu);
+	unique_ptr<T> value DUCKDB_GUARDED_BY(mu);
 };
 
 template <>
-class FutureWrapper<void> {
-public:
-	FutureWrapper(std::function<void()> functor, shared_ptr<Token> token_p) : token(std::move(token_p)) {
-		auto tok = token;
-		future = std::async(std::launch::async, [functor = std::move(functor), tok = std::move(tok)]() {
-			try {
-				functor();
-				{
-					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
-					tok->completed = true;
-					tok->cv.notify_all();
-				}
-			} catch (...) {
-				{
-					const concurrency::lock_guard<concurrency::mutex> lock(tok->mu);
-					tok->completed = true;
-					tok->cv.notify_all();
-				}
-				throw;
-			}
-		});
-	}
-
-	FutureWrapper(const FutureWrapper &) = delete;
-	FutureWrapper &operator=(const FutureWrapper &) = delete;
-
-	FutureWrapper(FutureWrapper &&other) noexcept : token(std::move(other.token)), future(std::move(other.future)) {
-	}
-
-	FutureWrapper &operator=(FutureWrapper &&other) noexcept {
-		if (this != &other) {
-			token = std::move(other.token);
-			future = std::move(other.future);
-		}
-		return *this;
-	}
-
-	~FutureWrapper() {
-		Wait();
-	}
-
-	bool IsReady() const {
-		if (!future.valid()) {
-			return false;
-		}
-		return future.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-	}
-
-	void Get() {
-		future.get();
-	}
-
-	void Wait() {
-		if (future.valid()) {
-			future.wait();
-		}
-	}
-
-private:
-	shared_ptr<Token> token;
-	std::future<void> future;
+struct HedgedOutcomeToken<void> {
+	concurrency::mutex mu;
+	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
+	bool completed DUCKDB_GUARDED_BY(mu) = false;
+	std::exception_ptr eptr DUCKDB_GUARDED_BY(mu);
 };
 
 template <typename T>
-struct WaitResult {
-	vector<FutureWrapper<T>> pending_futures;
-	T result;
-};
-
-template <>
-struct WaitResult<void> {
-	vector<FutureWrapper<void>> pending_futures;
-};
-
-// Wait until any of the futures completes.
-// Returns a WaitResult containing the result of the first completed future and pending futures.
-template <typename T>
-WaitResult<T> WaitForAny(vector<FutureWrapper<T>> futs, shared_ptr<Token> token) {
-	{
-		concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-		token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
+T WaitForHedgedOutcome(shared_ptr<HedgedOutcomeToken<T>> token) {
+	concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+	token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
+	if (token->eptr != nullptr) {
+		std::rethrow_exception(token->eptr);
 	}
-
-	WaitResult<T> result;
-	bool got_result = false;
-	for (auto &fut : futs) {
-		if (!got_result && fut.IsReady()) {
-			result.result = fut.Get();
-			got_result = true;
-		} else {
-			result.pending_futures.emplace_back(std::move(fut));
-		}
-	}
-	return result;
+	return std::move(*token->value);
 }
 
-template <>
-inline WaitResult<void> WaitForAny(vector<FutureWrapper<void>> futs, shared_ptr<Token> token) {
-	{
-		concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-		token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
+inline void WaitForHedgedOutcome(shared_ptr<HedgedOutcomeToken<void>> token) {
+	concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+	token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
+	if (token->eptr != nullptr) {
+		std::rethrow_exception(token->eptr);
 	}
+}
 
-	WaitResult<void> result;
-	bool got_result = false;
-	for (auto &fut : futs) {
-		if (!got_result && fut.IsReady()) {
-			fut.Get();
-			got_result = true;
-		} else {
-			result.pending_futures.emplace_back(std::move(fut));
+template <typename T>
+void RunHedgedJob(std::function<T()> fn, shared_ptr<HedgedOutcomeToken<T>> token) {
+	try {
+		T r = fn();
+		{
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+			ALWAYS_ASSERT(!token->completed);
+			token->value = make_uniq<T>(std::move(r));
+			token->completed = true;
+			token->cv.notify_all();
+		}
+	} catch (...) {
+		{
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+			ALWAYS_ASSERT(!token->completed);
+			token->eptr = std::current_exception();
+			token->completed = true;
+			token->cv.notify_all();
 		}
 	}
-	return result;
+}
+
+inline void RunHedgedVoidJob(std::function<void()> fn, shared_ptr<HedgedOutcomeToken<void>> token) {
+	try {
+		fn();
+		{
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+			if (!token->completed) {
+				token->completed = true;
+			}
+			token->cv.notify_all();
+		}
+	} catch (...) {
+		{
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+			ALWAYS_ASSERT(!token->completed);
+			token->eptr = std::current_exception();
+			token->completed = true;
+			token->cv.notify_all();
+		}
+	}
 }
 
 } // namespace duckdb

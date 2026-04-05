@@ -14,6 +14,7 @@
 #include "hedged_request_config.hpp"
 #include "thread_annotation.hpp"
 
+#include <future>
 #include <type_traits>
 
 namespace duckdb {
@@ -33,34 +34,27 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 
 	// Possibility-2: database file opener
 	auto *database_file_opener = dynamic_cast<DatabaseFileOpener *>(opener.get());
-	D_ASSERT(database_file_opener != nullptr);
+	ALWAYS_ASSERT(database_file_opener != nullptr);
 	return make_shared_ptr<DatabaseFileOpener>(*database_file_opener->TryGetDatabase());
-}
-
-template <typename T>
-bool HasAnyReady(const vector<FutureWrapper<T>> &futs) {
-	for (const auto &fut : futs) {
-		if (fut.IsReady()) {
-			return true;
-		}
-	}
-	return false;
 }
 
 template <typename T>
 typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::function<T()> fn,
                                                                         std::chrono::milliseconds hedged_request_delay,
                                                                         shared_ptr<HedgedRequestFsEntry> entry) {
-	auto token = make_shared_ptr<Token>();
-	using FutureType = FutureWrapper<T>;
+	auto token = make_shared_ptr<HedgedOutcomeToken<T>>();
+	vector<std::future<void>> job_futures;
+	auto &pool = entry->GetThreadPool();
 
-	FutureType primary {fn, token};
-	vector<FutureType> futs;
-	futs.emplace_back(std::move(primary));
+	auto submit = [&pool, fn, token, &job_futures]() {
+		job_futures.push_back(pool.Push([fn, token]() { RunHedgedJob(std::function<T()>(fn), token); }));
+	};
+
+	submit();
 
 	auto config = entry->GetConfig();
 
-	// Keep spawning hedged requests at threshold intervals until one completes or max count reached
+	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
 	while (true) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
@@ -72,36 +66,46 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 		}
 
 		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
-		if (futs.size() >= config.max_hedged_request_count) {
+		if (job_futures.size() >= config.max_hedged_request_count) {
 			continue;
 		}
 
-		// No request completed yet, spawn a new hedged request
-		FutureType hedged(fn, token);
-		futs.emplace_back(std::move(hedged));
+		submit();
 	}
 
-	// One of the requests finished (whether it succeeded or failed), now get the result
-	auto wait_result = WaitForAny(std::move(futs), token);
-	for (auto &fut : wait_result.pending_futures) {
-		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		entry->AddPendingRequest([pending_fut = std::move(pending_fut)]() { pending_fut->Wait(); });
-	}
+	auto drain_pending_futures = [&]() {
+		for (auto &fut : job_futures) {
+			auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
+			entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+		}
+		job_futures.clear();
+	};
 
-	return std::move(wait_result.result);
+	try {
+		T result = WaitForHedgedOutcome(token);
+		drain_pending_futures();
+		return result;
+	} catch (...) {
+		drain_pending_futures();
+		throw;
+	}
 }
 
 void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_request_delay,
                    shared_ptr<HedgedRequestFsEntry> entry) {
-	auto token = make_shared_ptr<Token>();
-	using FutureType = FutureWrapper<void>;
+	auto token = make_shared_ptr<HedgedOutcomeToken<void>>();
+	vector<std::future<void>> job_futures;
+	auto &pool = entry->GetThreadPool();
 
-	FutureType primary {fn, token};
-	vector<FutureType> futs;
-	futs.emplace_back(std::move(primary));
+	auto submit = [&pool, fn, token, &job_futures]() {
+		job_futures.push_back(pool.Push([fn, token]() { RunHedgedVoidJob(std::function<void()>(fn), token); }));
+	};
+
+	submit();
 
 	auto config = entry->GetConfig();
 
+	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
 	while (true) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
@@ -112,19 +116,29 @@ void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_re
 			}
 		}
 
-		if (futs.size() >= config.max_hedged_request_count) {
+		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
+		if (job_futures.size() >= config.max_hedged_request_count) {
 			continue;
 		}
 
-		FutureType hedged(fn, token);
-		futs.emplace_back(std::move(hedged));
+		submit();
 	}
 
-	auto wait_result = WaitForAny(std::move(futs), token);
-	for (auto &fut : wait_result.pending_futures) {
-		auto pending_fut = make_shared_ptr<FutureType>(std::move(fut));
-		entry->AddPendingRequest([pending_fut = std::move(pending_fut)]() { pending_fut->Wait(); });
+	auto drain_pending_futures = [&]() {
+		for (auto &fut : job_futures) {
+			auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
+			entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+		}
+		job_futures.clear();
+	};
+
+	try {
+		WaitForHedgedOutcome(token);
+	} catch (...) {
+		drain_pending_futures();
+		throw;
 	}
+	drain_pending_futures();
 }
 } // namespace
 
