@@ -1,7 +1,7 @@
 #pragma once
 
 #include "duckdb/common/local_file_system.hpp"
-#include "duckdb/common/mutex.hpp"
+#include "mutex.hpp"
 #include "thread_annotation.hpp"
 
 #include <chrono>
@@ -54,7 +54,7 @@ protected:
 private:
 	void SimulateDelay();
 
-	mutex delay_mutex;
+	concurrency::mutex delay_mutex;
 	std::chrono::milliseconds delay DUCKDB_GUARDED_BY(delay_mutex);
 	bool simulate_io_failure DUCKDB_GUARDED_BY(delay_mutex) = false;
 };

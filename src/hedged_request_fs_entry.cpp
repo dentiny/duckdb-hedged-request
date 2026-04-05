@@ -19,7 +19,7 @@ optional_idx HedgedRequestFsEntry::GetEstimatedCacheMemory() const {
 void HedgedRequestFsEntry::AddPendingRequest(std::function<void()> functor) {
 	auto token = make_shared_ptr<Token>();
 	FutureWrapper<void> future(std::move(functor), token);
-	const lock_guard<mutex> lock(cache_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	pending_requests.push_back(std::move(future));
 	CleanupCompleted();
 }
@@ -31,7 +31,7 @@ void HedgedRequestFsEntry::CleanupCompleted() {
 }
 
 void HedgedRequestFsEntry::WaitAll() {
-	const lock_guard<mutex> lock(cache_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	for (auto &future : pending_requests) {
 		future.Wait();
 	}
@@ -39,7 +39,7 @@ void HedgedRequestFsEntry::WaitAll() {
 }
 
 HedgedRequestConfig HedgedRequestFsEntry::GetConfig() const {
-	const lock_guard<mutex> lock(cache_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	return config;
 }
 
@@ -49,12 +49,12 @@ void HedgedRequestFsEntry::UpdateConfig(HedgedRequestOperation operation, std::c
 		throw InvalidInputException("Invalid operation: %d", NumericCast<int>(operation));
 	}
 
-	const lock_guard<mutex> lock(cache_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	config.delays_ms[NumericCast<size_t>(operation)] = delay_ms;
 }
 
 void HedgedRequestFsEntry::UpdateMaxHedgedRequestCount(size_t max_count) {
-	const lock_guard<mutex> lock(cache_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
 	config.max_hedged_request_count = max_count;
 }
 

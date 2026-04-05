@@ -10,12 +10,12 @@ MockFileSystem::MockFileSystem() : delay(std::chrono::milliseconds(0)) {
 }
 
 void MockFileSystem::SetSimulateIoFailure(bool failure) {
-	const lock_guard<mutex> lock(delay_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
 	simulate_io_failure = failure;
 }
 
 void MockFileSystem::SetDelay(std::chrono::milliseconds delay_p) {
-	const lock_guard<mutex> lock(delay_mutex);
+	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
 	delay = delay_p;
 }
 
@@ -108,14 +108,14 @@ bool MockFileSystem::SupportsListFilesExtended() const {
 void MockFileSystem::SimulateDelay() {
 	std::chrono::milliseconds current_delay;
 	{
-		const lock_guard<mutex> lock(delay_mutex);
+		const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
 		current_delay = delay;
 	}
 	if (current_delay.count() > 0) {
 		std::this_thread::sleep_for(current_delay);
 	}
 	{
-		const lock_guard<mutex> lock(delay_mutex);
+		const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
 		if (simulate_io_failure) {
 			throw IOException("MockFileSystem: simulated IOException");
 		}
