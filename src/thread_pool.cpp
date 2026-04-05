@@ -30,7 +30,7 @@ ThreadPool::ThreadPool(size_t thread_num) : idle_num_(thread_num) {
 					}
 					cur_job = std::move(jobs_.front());
 					jobs_.pop();
-					D_ASSERT(idle_num_ > 0);
+					ALWAYS_ASSERT(idle_num_ > 0);
 					idle_num_--;
 				}
 
@@ -66,7 +66,7 @@ ThreadPool::~ThreadPool() noexcept {
 		new_job_cv_.notify_all();
 	}
 	for (auto &cur_worker : workers_) {
-		D_ASSERT(cur_worker.joinable());
+		ALWAYS_ASSERT(cur_worker.joinable());
 		cur_worker.join();
 	}
 }

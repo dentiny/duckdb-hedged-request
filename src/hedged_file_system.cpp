@@ -34,7 +34,7 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 
 	// Possibility-2: database file opener
 	auto *database_file_opener = dynamic_cast<DatabaseFileOpener *>(opener.get());
-	D_ASSERT(database_file_opener != nullptr);
+	ALWAYS_ASSERT(database_file_opener != nullptr);
 	return make_shared_ptr<DatabaseFileOpener>(*database_file_opener->TryGetDatabase());
 }
 
