@@ -4,8 +4,7 @@ set(TARGET_NAME hedged_request_fs)
 
 set(CMAKE_CXX_STANDARD 14)
 
-if(CMAKE_CXX_COMPILER_ID_LOWER MATCHES "clang" OR CMAKE_CXX_COMPILER_LOWER
-                                                  MATCHES "clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=thread-safety")
 endif()
 
