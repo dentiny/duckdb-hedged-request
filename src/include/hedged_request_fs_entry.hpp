@@ -50,7 +50,7 @@ private:
 	// Try to clean up completed requests in a non-blocking style.
 	void CleanupCompleted() DUCKDB_REQUIRES(cache_mutex);
 
-	mutable mutex cache_mutex;
+	mutable concurrency::mutex cache_mutex;
 	vector<std::future<void>> pending_requests DUCKDB_GUARDED_BY(cache_mutex);
 	HedgedRequestConfig config DUCKDB_GUARDED_BY(cache_mutex);
 	ThreadPool thread_pool;
