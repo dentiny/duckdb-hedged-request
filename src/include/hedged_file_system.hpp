@@ -1,7 +1,6 @@
 #pragma once
 
 #include "duckdb/common/file_system.hpp"
-#include "duckdb/common/mutex.hpp"
 #include "duckdb/common/shared_ptr.hpp"
 #include "hedged_request_fs_entry.hpp"
 

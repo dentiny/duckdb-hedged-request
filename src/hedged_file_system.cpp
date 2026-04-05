@@ -56,7 +56,7 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 
 	while (true) {
 		{
-			unique_lock<mutex> lock(token->mu);
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
 			token->cv.wait_for(lock, hedged_request_delay,
 			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 			if (token->completed) {
@@ -95,7 +95,7 @@ void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_re
 
 	while (true) {
 		{
-			unique_lock<mutex> lock(token->mu);
+			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
 			token->cv.wait_for(lock, hedged_request_delay,
 			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 			if (token->completed) {
@@ -285,7 +285,7 @@ bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpene
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
                                  FileOpener *opener) {
 	auto results = make_shared_ptr<vector<std::pair<string, bool>>>();
-	auto results_mutex = make_shared_ptr<mutex>();
+	auto results_mutex = make_shared_ptr<concurrency::mutex>();
 
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
@@ -295,7 +295,7 @@ bool HedgedFileSystem::ListFiles(const string &directory, const std::function<vo
 		    return fs_ptr->ListFiles(
 		        directory_copy,
 		        [results, results_mutex](const string &name, bool is_dir) {
-			        const lock_guard<mutex> lock(*results_mutex);
+			        const concurrency::lock_guard<concurrency::mutex> lock(*results_mutex);
 			        results->emplace_back(name, is_dir);
 		        },
 		        opener_copy.get());
