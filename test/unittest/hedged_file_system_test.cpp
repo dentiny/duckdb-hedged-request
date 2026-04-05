@@ -488,6 +488,29 @@ TEST_CASE("HedgedFileSystem propagates IOException from wrapped OpenFile", "[hed
 	REQUIRE_THROWS_AS(hedged_fs->OpenFile(path, FileFlags::FILE_FLAGS_READ, /*opener=*/nullptr), IOException);
 }
 
+TEST_CASE("HedgedFileSystem IOException from GetFileSize with multiple hedged requests", "[hedged_file_system]") {
+	string test_file = TestCreatePath("hedged_test_gsize_io_fail_multi.txt");
+	CreateTestFile(test_file, TEST_CONTENT);
+
+	auto mock_fs = make_uniq<MockFileSystem>();
+	mock_fs->SetDelay(std::chrono::milliseconds(200));
+	mock_fs->SetSimulateIoFailure(true);
+	mock_fs->SetSkipSimulatedIoFailureCalls(1);
+
+	auto entry = make_shared_ptr<HedgedRequestFsEntry>();
+	auto hedged_fs = make_uniq<HedgedFileSystem>(std::move(mock_fs), entry);
+
+	entry->UpdateConfig(HedgedRequestOperation::GET_FILE_SIZE, std::chrono::milliseconds(50));
+
+	auto file_handle = hedged_fs->OpenFile(test_file, FileFlags::FILE_FLAGS_READ, /*opener=*/nullptr);
+	REQUIRE(file_handle != nullptr);
+
+	REQUIRE_THROWS_AS(hedged_fs->GetFileSize(*file_handle), IOException);
+
+	file_handle->Close();
+	entry->WaitAll();
+}
+
 // Testing scenario: if operation timeout is far shorter than the delay, multiple hedged requests should be spawned.
 TEST_CASE("HedgedFileSystem multiple hedged requests at threshold intervals", "[hedged_file_system]") {
 	string test_file = TestCreatePath("hedged_test_multiple.txt");

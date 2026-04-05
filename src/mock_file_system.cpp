@@ -14,6 +14,11 @@ void MockFileSystem::SetSimulateIoFailure(bool failure) {
 	simulate_io_failure = failure;
 }
 
+void MockFileSystem::SetSkipSimulatedIoFailureCalls(int count) {
+	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+	skip_simulated_io_failure_calls = count;
+}
+
 void MockFileSystem::SetDelay(std::chrono::milliseconds delay_p) {
 	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
 	delay = delay_p;
@@ -116,6 +121,10 @@ void MockFileSystem::SimulateDelay() {
 	}
 	{
 		const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+		if (skip_simulated_io_failure_calls > 0) {
+			skip_simulated_io_failure_calls--;
+			return;
+		}
 		if (simulate_io_failure) {
 			throw IOException("MockFileSystem: simulated IOException");
 		}

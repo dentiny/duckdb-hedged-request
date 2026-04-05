@@ -41,7 +41,7 @@ public:
 	// Update the maximum number of hedged requests to spawn
 	void UpdateMaxHedgedRequestCount(size_t max_count);
 
-	// Per-database thread pool (this entry lives in ObjectCache and does not evict).
+	// Per-database thread pool.
 	ThreadPool &GetThreadPool() {
 		return thread_pool;
 	}

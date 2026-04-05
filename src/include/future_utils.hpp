@@ -53,19 +53,17 @@ void RunHedgedJob(std::function<T()> fn, shared_ptr<HedgedOutcomeToken<T>> token
 		T r = fn();
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			if (!token->completed) {
-				token->value = make_uniq<T>(std::move(r));
-				token->completed = true;
-			}
+			ALWAYS_ASSERT(!token->completed);
+			token->value = make_uniq<T>(std::move(r));
+			token->completed = true;
 			token->cv.notify_all();
 		}
 	} catch (...) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			if (!token->completed) {
-				token->eptr = std::current_exception();
-				token->completed = true;
-			}
+			ALWAYS_ASSERT(!token->completed);
+			token->eptr = std::current_exception();
+			token->completed = true;
 			token->cv.notify_all();
 		}
 	}
@@ -84,10 +82,9 @@ inline void RunHedgedVoidJob(std::function<void()> fn, shared_ptr<HedgedOutcomeT
 	} catch (...) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			if (!token->completed) {
-				token->eptr = std::current_exception();
-				token->completed = true;
-			}
+			ALWAYS_ASSERT(!token->completed);
+			token->eptr = std::current_exception();
+			token->completed = true;
 			token->cv.notify_all();
 		}
 	}

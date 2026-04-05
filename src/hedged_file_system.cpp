@@ -54,6 +54,7 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 
 	auto config = entry->GetConfig();
 
+	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
 	while (true) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
@@ -64,6 +65,7 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 			}
 		}
 
+		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
 		if (job_futures.size() >= config.max_hedged_request_count) {
 			continue;
 		}
@@ -71,12 +73,22 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 		submit();
 	}
 
-	T result = WaitForHedgedOutcome(token);
-	for (auto &fut : job_futures) {
-		auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
-		entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+	auto drain_pending_futures = [&]() {
+		for (auto &fut : job_futures) {
+			auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
+			entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+		}
+		job_futures.clear();
+	};
+
+	try {
+		T result = WaitForHedgedOutcome(token);
+		drain_pending_futures();
+		return result;
+	} catch (...) {
+		drain_pending_futures();
+		throw;
 	}
-	return result;
 }
 
 void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_request_delay,
@@ -93,6 +105,7 @@ void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_re
 
 	auto config = entry->GetConfig();
 
+	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
 	while (true) {
 		{
 			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
@@ -103,6 +116,7 @@ void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_re
 			}
 		}
 
+		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
 		if (job_futures.size() >= config.max_hedged_request_count) {
 			continue;
 		}
@@ -110,11 +124,21 @@ void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_re
 		submit();
 	}
 
-	WaitForHedgedOutcome(token);
-	for (auto &fut : job_futures) {
-		auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
-		entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+	auto drain_pending_futures = [&]() {
+		for (auto &fut : job_futures) {
+			auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
+			entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
+		}
+		job_futures.clear();
+	};
+
+	try {
+		WaitForHedgedOutcome(token);
+	} catch (...) {
+		drain_pending_futures();
+		throw;
 	}
+	drain_pending_futures();
 }
 } // namespace
 
