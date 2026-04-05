@@ -1,10 +1,17 @@
 #include "mock_file_system.hpp"
 
+#include "duckdb/common/exception.hpp"
+
 #include <thread>
 
 namespace duckdb {
 
 MockFileSystem::MockFileSystem() : delay(std::chrono::milliseconds(0)) {
+}
+
+void MockFileSystem::SetSimulateIoFailure(bool failure) {
+	const lock_guard<mutex> lock(delay_mutex);
+	simulate_io_failure = failure;
 }
 
 void MockFileSystem::SetDelay(std::chrono::milliseconds delay_p) {
@@ -106,6 +113,12 @@ void MockFileSystem::SimulateDelay() {
 	}
 	if (current_delay.count() > 0) {
 		std::this_thread::sleep_for(current_delay);
+	}
+	{
+		const lock_guard<mutex> lock(delay_mutex);
+		if (simulate_io_failure) {
+			throw IOException("MockFileSystem: simulated IOException");
+		}
 	}
 }
 
