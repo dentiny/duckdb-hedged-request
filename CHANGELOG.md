@@ -1,3 +1,9 @@
+## 0.2.0
+
+### Changed
+
+- Upgrade DuckDB and extension-ci-tools to v1.5.2
+
 ## 0.1.0
 
 ### Fixed
