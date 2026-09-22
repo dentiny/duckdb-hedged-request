@@ -1,3 +1,10 @@
+## 0.2.4
+
+### Added
+
+- Added descriptions, examples, parameter names, and categories for all
+  extension functions in `duckdb_functions()`.
+
 ## 0.2.3
 
 ### Changed

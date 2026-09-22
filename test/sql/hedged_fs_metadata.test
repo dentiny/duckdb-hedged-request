@@ -1,0 +1,16 @@
+# name: test/sql/hedged_fs_metadata.test
+# description: test catalog metadata for hedged request filesystem functions
+# group: [sql]
+
+require hedged_request_fs
+
+query I
+SELECT count(*)
+FROM duckdb_functions()
+WHERE function_name IN ('hedged_fs_list_filesystems', 'hedged_fs_wrap')
+AND description IS NOT NULL
+AND examples IS NOT NULL
+AND categories IS NOT NULL
+AND parameters IS NOT NULL;
+----
+2
