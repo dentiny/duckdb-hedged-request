@@ -20,8 +20,7 @@ void LoadInternal(ExtensionLoader &loader) {
 	RegisterHedgedFsSettings(db);
 
 	// Register filesystem management functions
-	loader.RegisterFunction(GetHedgedFsListFilesystemsFunction());
-	loader.RegisterFunction(GetHedgedFsWrapFunction());
+	RegisterHedgedFsFunctions(loader);
 
 	// Register MockFileSystem at extension load for testing purpose
 	auto &opener_fs = db.GetFileSystem().Cast<OpenerFileSystem>();

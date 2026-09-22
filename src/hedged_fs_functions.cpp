@@ -9,6 +9,9 @@
 #include "duckdb/logging/logger.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/main/database.hpp"
+#include "duckdb/main/extension/extension_loader.hpp"
+#include "duckdb/parser/parsed_data/create_scalar_function_info.hpp"
+#include "duckdb/parser/parsed_data/create_table_function_info.hpp"
 #include "duckdb/storage/object_cache.hpp"
 #include "hedged_file_system.hpp"
 #include "hedged_request_fs_entry.hpp"
@@ -100,6 +103,21 @@ void HedgedFsWrapFunction(DataChunk &args, ExpressionState &state, Vector &resul
 	});
 }
 
+template <class FUNCTION_INFO>
+void RegisterFunctionWithMetadata(ExtensionLoader &loader, FUNCTION_INFO info, vector<string> parameter_names,
+                                  string description, string example) {
+	info.on_conflict = OnCreateConflict::ALTER_ON_CONFLICT;
+
+	FunctionDescription function_description;
+	function_description.parameter_names = std::move(parameter_names);
+	function_description.description = std::move(description);
+	function_description.examples = {std::move(example)};
+	function_description.categories = {"filesystem"};
+	info.descriptions.push_back(std::move(function_description));
+
+	loader.RegisterFunction(std::move(info));
+}
+
 } // namespace
 
 TableFunction GetHedgedFsListFilesystemsFunction() {
@@ -111,6 +129,17 @@ TableFunction GetHedgedFsListFilesystemsFunction() {
 ScalarFunction GetHedgedFsWrapFunction() {
 	return ScalarFunction("hedged_fs_wrap", {/*filesystem_name=*/LogicalType {LogicalTypeId::VARCHAR}},
 	                      /*return_type=*/LogicalType {LogicalTypeId::BOOLEAN}, HedgedFsWrapFunction);
+}
+
+void RegisterHedgedFsFunctions(ExtensionLoader &loader) {
+	RegisterFunctionWithMetadata(
+	    loader, CreateTableFunctionInfo(GetHedgedFsListFilesystemsFunction()), /*parameter_names=*/ {},
+	    /*description=*/"Lists the names of all filesystem subsystems currently registered with DuckDB.",
+	    /*example=*/"SELECT * FROM hedged_fs_list_filesystems();");
+	RegisterFunctionWithMetadata(
+	    loader, CreateScalarFunctionInfo(GetHedgedFsWrapFunction()), /*parameter_names=*/ {"filesystem_name"},
+	    /*description=*/"Wraps a registered filesystem subsystem with hedged requests and returns true on success.",
+	    /*example=*/"SELECT hedged_fs_wrap('S3FileSystem');");
 }
 
 } // namespace duckdb
