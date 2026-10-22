@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Mark filesystem wrapping as fallible so missing-filesystem errors remain regular execution errors on DuckDB v2; use nondeprecated vector output APIs.
 - Preserve the first completed hedged result or exception when later requests finish.
 
 ## 0.2.4
