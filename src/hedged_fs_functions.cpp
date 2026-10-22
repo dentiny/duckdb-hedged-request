@@ -67,13 +67,13 @@ void ListFilesystemsFunction(ClientContext &context, TableFunctionInput &data, D
 
 	idx_t count = 0;
 	while (state.current_idx < state.filesystems.size() && count < STANDARD_VECTOR_SIZE) {
-		output.SetValue(0, count, Value(state.filesystems[state.current_idx]));
+		output.data[0].Append(Value(state.filesystems[state.current_idx]));
 
 		state.current_idx++;
 		count++;
 	}
 
-	output.SetCardinality(count);
+	output.CheckCardinality(count);
 }
 
 //===--------------------------------------------------------------------===//
@@ -128,8 +128,11 @@ TableFunction GetHedgedFsListFilesystemsFunction() {
 }
 
 ScalarFunction GetHedgedFsWrapFunction() {
-	return ScalarFunction("hedged_fs_wrap", {/*filesystem_name=*/LogicalType {LogicalTypeId::VARCHAR}},
-	                      /*return_type=*/LogicalType {LogicalTypeId::BOOLEAN}, HedgedFsWrapFunction);
+	ScalarFunction function("hedged_fs_wrap", {/*filesystem_name=*/LogicalType {LogicalTypeId::VARCHAR}},
+	                        /*return_type=*/LogicalType {LogicalTypeId::BOOLEAN}, HedgedFsWrapFunction);
+	function.SetFallible();
+	function.GetSignature().GetParameter(0).SetName("filesystem_name");
+	return function;
 }
 
 void RegisterHedgedFsFunctions(ExtensionLoader &loader) {
