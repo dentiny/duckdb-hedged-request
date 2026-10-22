@@ -10,17 +10,17 @@ MockFileSystem::MockFileSystem() : delay(std::chrono::milliseconds(0)) {
 }
 
 void MockFileSystem::SetSimulateIoFailure(bool failure) {
-	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(delay_mutex);
 	simulate_io_failure = failure;
 }
 
 void MockFileSystem::SetSkipSimulatedIoFailureCalls(int count) {
-	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(delay_mutex);
 	skip_simulated_io_failure_calls = count;
 }
 
 void MockFileSystem::SetDelay(std::chrono::milliseconds delay_p) {
-	const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(delay_mutex);
 	delay = delay_p;
 }
 
@@ -113,14 +113,14 @@ bool MockFileSystem::SupportsListFilesExtended() const {
 void MockFileSystem::SimulateDelay() {
 	std::chrono::milliseconds current_delay;
 	{
-		const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+		const annotated_lock_guard<annotated_mutex> lock(delay_mutex);
 		current_delay = delay;
 	}
 	if (current_delay.count() > 0) {
 		std::this_thread::sleep_for(current_delay);
 	}
 	{
-		const concurrency::lock_guard<concurrency::mutex> lock(delay_mutex);
+		const annotated_lock_guard<annotated_mutex> lock(delay_mutex);
 		if (skip_simulated_io_failure_calls > 0) {
 			skip_simulated_io_failure_calls--;
 			return;

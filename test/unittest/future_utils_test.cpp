@@ -56,3 +56,33 @@ TEST_CASE("HedgedOutcomeToken first completion wins", "[future_utils]") {
 	int v = WaitForHedgedOutcome(token);
 	REQUIRE((v == 1 || v == 2));
 }
+
+TEST_CASE("Hedged value completion ignores later results and failures", "[future_utils]") {
+	auto token = make_shared_ptr<HedgedOutcomeToken<int>>();
+	RunHedgedJob(std::function<int()>([]() { return 42; }), token);
+	RunHedgedJob(std::function<int()>([]() { return 99; }), token);
+	RunHedgedJob(std::function<int()>([]() -> int { throw std::runtime_error("late failure"); }), token);
+	REQUIRE(WaitForHedgedOutcome(token) == 42);
+}
+
+TEST_CASE("Hedged void completion ignores later failures", "[future_utils]") {
+	auto token = make_shared_ptr<HedgedOutcomeToken<void>>();
+	RunHedgedVoidJob(std::function<void()>([]() {}), token);
+	RunHedgedVoidJob(std::function<void()>([]() { throw std::runtime_error("late failure"); }), token);
+	REQUIRE_NOTHROW(WaitForHedgedOutcome(token));
+}
+
+TEST_CASE("Hedged first failure survives later success", "[future_utils]") {
+	SECTION("value result") {
+		auto token = make_shared_ptr<HedgedOutcomeToken<int>>();
+		RunHedgedJob(std::function<int()>([]() -> int { throw std::runtime_error("first failure"); }), token);
+		RunHedgedJob(std::function<int()>([]() { return 42; }), token);
+		REQUIRE_THROWS_WITH(WaitForHedgedOutcome(token), "first failure");
+	}
+	SECTION("void result") {
+		auto token = make_shared_ptr<HedgedOutcomeToken<void>>();
+		RunHedgedVoidJob(std::function<void()>([]() { throw std::runtime_error("first failure"); }), token);
+		RunHedgedVoidJob(std::function<void()>([]() {}), token);
+		REQUIRE_THROWS_WITH(WaitForHedgedOutcome(token), "first failure");
+	}
+}

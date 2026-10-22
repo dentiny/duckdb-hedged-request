@@ -59,7 +59,7 @@ public:
 	string GetName() const override;
 
 	void RegisterSubSystem(unique_ptr<FileSystem> sub_fs) override;
-	void RegisterSubSystem(FileCompressionType compression_type, unique_ptr<FileSystem> fs) override;
+	void RegisterCompressionFilesystem(unique_ptr<CompressedFileSystem> fs) override;
 	void UnregisterSubSystem(const string &name) override;
 	void SetDisabledFileSystems(const vector<string> &names) override;
 	bool SubSystemIsDisabled(const string &name) override;
@@ -93,7 +93,6 @@ public:
 	}
 
 private:
-	HedgedFileSystem &hedged_fs;
 	shared_ptr<FileHandle> wrapped_handle;
 };
 

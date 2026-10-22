@@ -1,3 +1,17 @@
+## 0.3.0
+
+### Changed
+
+- Upgrade DuckDB to `v2.0.0` and extension-ci-tools to the latest commit.
+- Require C++17, use Identifier for table-function output names, and replace deprecated type traits with `std::invoke_result_t`.
+- Reuse DuckDB's annotated mutexes and locks instead of maintaining local threading utilities.
+- Share void and value-returning hedged-request handling with C++17 `if constexpr`.
+- Update extension metadata, CI pins, and source/prebuilt unit-test linkage.
+
+### Fixed
+
+- Preserve the first completed hedged result or exception when later requests finish.
+
 ## 0.2.4
 
 ### Changed

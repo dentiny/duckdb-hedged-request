@@ -21,7 +21,7 @@ optional_idx HedgedRequestFsEntry::GetEstimatedCacheMemory() const {
 
 void HedgedRequestFsEntry::AddPendingRequest(std::function<void()> functor) {
 	auto future = thread_pool.Push(std::move(functor));
-	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(cache_mutex);
 	pending_requests.push_back(std::move(future));
 	CleanupCompleted();
 }
@@ -35,7 +35,7 @@ void HedgedRequestFsEntry::CleanupCompleted() DUCKDB_REQUIRES(cache_mutex) {
 }
 
 void HedgedRequestFsEntry::WaitAll() {
-	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(cache_mutex);
 	for (auto &future : pending_requests) {
 		future.wait();
 	}
@@ -43,7 +43,7 @@ void HedgedRequestFsEntry::WaitAll() {
 }
 
 HedgedRequestConfig HedgedRequestFsEntry::GetConfig() const {
-	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(cache_mutex);
 	return config;
 }
 
@@ -53,12 +53,12 @@ void HedgedRequestFsEntry::UpdateConfig(HedgedRequestOperation operation, std::c
 		throw InvalidInputException("Invalid operation: %d", NumericCast<int>(operation));
 	}
 
-	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(cache_mutex);
 	config.delays_ms[NumericCast<size_t>(operation)] = delay_ms;
 }
 
 void HedgedRequestFsEntry::UpdateMaxHedgedRequestCount(size_t max_count) {
-	const concurrency::lock_guard<concurrency::mutex> lock(cache_mutex);
+	const annotated_lock_guard<annotated_mutex> lock(cache_mutex);
 	config.max_hedged_request_count = max_count;
 }
 

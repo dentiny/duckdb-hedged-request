@@ -3,6 +3,7 @@
 #include "duckdb/common/algorithm.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/common/identifier.hpp"
 #include "duckdb/common/opener_file_system.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/common/virtual_file_system.hpp"
@@ -47,7 +48,7 @@ struct ListFilesystemsData : public GlobalTableFunctionState {
 };
 
 unique_ptr<FunctionData> ListFilesystemsBind(ClientContext &context, TableFunctionBindInput &input,
-                                             vector<LogicalType> &return_types, vector<string> &names) {
+                                             vector<LogicalType> &return_types, vector<Identifier> &names) {
 	names.emplace_back("name");
 	return_types.emplace_back(LogicalType {LogicalTypeId::VARCHAR});
 	return nullptr;
@@ -58,7 +59,7 @@ unique_ptr<GlobalTableFunctionState> ListFilesystemsInit(ClientContext &context,
 	auto &vfs = GetVirtualFileSystem(context).Cast<VirtualFileSystem>();
 	result->filesystems = vfs.ListSubSystems();
 	std::sort(result->filesystems.begin(), result->filesystems.end());
-	return std::move(result);
+	return result;
 }
 
 void ListFilesystemsFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {

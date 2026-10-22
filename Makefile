@@ -12,4 +12,7 @@ format-all: format
 	cmake-format -i CMakeLists.txt
 	cmake-format -i test/unittest/CMakeLists.txt
 
-.PHONY: format-all
+test_release_unit test_debug_unit test_reldebug_unit: test_%_unit:
+	./build/$*/extension/hedged_request_fs/test/unittest/unittest_hedged_file_system
+
+.PHONY: format-all test_release_unit test_debug_unit test_reldebug_unit
