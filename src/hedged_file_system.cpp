@@ -1,5 +1,6 @@
 #include "hedged_file_system.hpp"
 
+#include "duckdb/common/compressed_file_system.hpp"
 #include "duckdb/common/enums/file_glob_options.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/multi_file/multi_file_list.hpp"
@@ -12,7 +13,6 @@
 #include "duckdb/storage/object_cache.hpp"
 #include "future_utils.hpp"
 #include "hedged_request_config.hpp"
-#include "thread_annotation.hpp"
 
 #include <future>
 #include <type_traits>
@@ -26,22 +26,18 @@ shared_ptr<FileOpener> CopyFileOpener(optional_ptr<FileOpener> opener) {
 		return nullptr;
 	}
 
-	// Possibility-1: client context file opener
-	auto *client_context_opener = dynamic_cast<ClientContextFileOpener *>(opener.get());
-	if (client_context_opener != nullptr) {
-		return make_shared_ptr<ClientContextFileOpener>(*client_context_opener->TryGetClientContext());
+	if (auto context = FileOpener::TryGetClientContext(opener)) {
+		return make_shared_ptr<ClientContextFileOpener>(*context);
 	}
-
-	// Possibility-2: database file opener
-	auto *database_file_opener = dynamic_cast<DatabaseFileOpener *>(opener.get());
-	ALWAYS_ASSERT(database_file_opener != nullptr);
-	return make_shared_ptr<DatabaseFileOpener>(*database_file_opener->TryGetDatabase());
+	if (auto db = FileOpener::TryGetDatabase(opener)) {
+		return make_shared_ptr<DatabaseFileOpener>(*db);
+	}
+	throw InternalException("HedgedFileSystem cannot copy a file opener without a client context or database");
 }
 
 template <typename T>
-typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::function<T()> fn,
-                                                                        std::chrono::milliseconds hedged_request_delay,
-                                                                        shared_ptr<HedgedRequestFsEntry> entry) {
+T HedgedRequest(std::function<T()> fn, std::chrono::milliseconds hedged_request_delay,
+                shared_ptr<HedgedRequestFsEntry> entry) {
 	auto token = make_shared_ptr<HedgedOutcomeToken<T>>();
 	vector<std::future<void>> job_futures;
 	auto &pool = entry->GetThreadPool();
@@ -57,7 +53,7 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
 	while (true) {
 		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+			annotated_unique_lock<annotated_mutex> lock(token->mu);
 			token->cv.wait_for(lock, hedged_request_delay,
 			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 			if (token->completed) {
@@ -82,63 +78,18 @@ typename std::enable_if<!std::is_void<T>::value, T>::type HedgedRequest(std::fun
 	};
 
 	try {
-		T result = WaitForHedgedOutcome(token);
-		drain_pending_futures();
-		return result;
+		if constexpr (std::is_void_v<T>) {
+			WaitForHedgedOutcome(token);
+			drain_pending_futures();
+		} else {
+			T result = WaitForHedgedOutcome(token);
+			drain_pending_futures();
+			return result;
+		}
 	} catch (...) {
 		drain_pending_futures();
 		throw;
 	}
-}
-
-void HedgedRequest(std::function<void()> fn, std::chrono::milliseconds hedged_request_delay,
-                   shared_ptr<HedgedRequestFsEntry> entry) {
-	auto token = make_shared_ptr<HedgedOutcomeToken<void>>();
-	vector<std::future<void>> job_futures;
-	auto &pool = entry->GetThreadPool();
-
-	auto submit = [&pool, fn, token, &job_futures]() {
-		job_futures.push_back(pool.Push([fn, token]() { RunHedgedVoidJob(std::function<void()>(fn), token); }));
-	};
-
-	submit();
-
-	auto config = entry->GetConfig();
-
-	// Keep spawning hedged requests at threshold intervals until one completes or max count reached.
-	while (true) {
-		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			token->cv.wait_for(lock, hedged_request_delay,
-			                   [&token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
-			if (token->completed) {
-				break;
-			}
-		}
-
-		// We've reached upper bound, so don't spawn new hedged requests, simply wait for the first completed request.
-		if (job_futures.size() >= config.max_hedged_request_count) {
-			continue;
-		}
-
-		submit();
-	}
-
-	auto drain_pending_futures = [&]() {
-		for (auto &fut : job_futures) {
-			auto pending_fut = std::make_shared<std::future<void>>(std::move(fut));
-			entry->AddPendingRequest([pending_fut]() { pending_fut->wait(); });
-		}
-		job_futures.clear();
-	};
-
-	try {
-		WaitForHedgedOutcome(token);
-	} catch (...) {
-		drain_pending_futures();
-		throw;
-	}
-	drain_pending_futures();
 }
 } // namespace
 
@@ -222,8 +173,8 @@ void HedgedFileSystem::RegisterSubSystem(unique_ptr<FileSystem> sub_fs) {
 	wrapped_fs->RegisterSubSystem(std::move(sub_fs));
 }
 
-void HedgedFileSystem::RegisterSubSystem(FileCompressionType compression_type, unique_ptr<FileSystem> fs) {
-	wrapped_fs->RegisterSubSystem(compression_type, std::move(fs));
+void HedgedFileSystem::RegisterCompressionFilesystem(unique_ptr<CompressedFileSystem> fs) {
+	wrapped_fs->RegisterCompressionFilesystem(std::move(fs));
 }
 
 void HedgedFileSystem::UnregisterSubSystem(const string &name) {
@@ -309,7 +260,7 @@ bool HedgedFileSystem::FileExists(const string &filename, optional_ptr<FileOpene
 bool HedgedFileSystem::ListFiles(const string &directory, const std::function<void(const string &, bool)> &callback,
                                  FileOpener *opener) {
 	auto results = make_shared_ptr<vector<std::pair<string, bool>>>();
-	auto results_mutex = make_shared_ptr<concurrency::mutex>();
+	auto results_mutex = make_shared_ptr<annotated_mutex>();
 
 	auto *fs_ptr = wrapped_fs.get();
 	auto opener_copy = CopyFileOpener(opener);
@@ -319,7 +270,7 @@ bool HedgedFileSystem::ListFiles(const string &directory, const std::function<vo
 		    return fs_ptr->ListFiles(
 		        directory_copy,
 		        [results, results_mutex](const string &name, bool is_dir) {
-			        const concurrency::lock_guard<concurrency::mutex> lock(*results_mutex);
+			        const annotated_lock_guard<annotated_mutex> lock(*results_mutex);
 			        results->emplace_back(name, is_dir);
 		        },
 		        opener_copy.get());
@@ -473,7 +424,7 @@ void HedgedFileSystem::RemoveDirectory(const string &directory, optional_ptr<Fil
 //===--------------------------------------------------------------------===//
 
 HedgedFileHandle::HedgedFileHandle(HedgedFileSystem &fs, unique_ptr<FileHandle> wrapped_handle, const string &path)
-    : FileHandle(fs, path, wrapped_handle->GetFlags()), hedged_fs(fs),
+    : FileHandle(fs, path, wrapped_handle->GetFlags()),
       wrapped_handle(wrapped_handle.release(), [](FileHandle *handle) {
 	      if (handle) {
 		      handle->Close();

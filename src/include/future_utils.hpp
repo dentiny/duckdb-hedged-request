@@ -3,18 +3,18 @@
 #include "duckdb/common/helper.hpp"
 #include "duckdb/common/shared_ptr.hpp"
 #include "duckdb/common/unique_ptr.hpp"
-#include "mutex.hpp"
-#include "thread_annotation.hpp"
+#include "duckdb/common/mutex.hpp"
 
 #include <condition_variable>
 #include <exception>
 #include <functional>
+#include <type_traits>
 
 namespace duckdb {
 
 template <typename T>
 struct HedgedOutcomeToken {
-	concurrency::mutex mu;
+	annotated_mutex mu;
 	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
 	bool completed DUCKDB_GUARDED_BY(mu) = false;
 	std::exception_ptr eptr DUCKDB_GUARDED_BY(mu);
@@ -23,7 +23,7 @@ struct HedgedOutcomeToken {
 
 template <>
 struct HedgedOutcomeToken<void> {
-	concurrency::mutex mu;
+	annotated_mutex mu;
 	std::condition_variable cv DUCKDB_GUARDED_BY(mu);
 	bool completed DUCKDB_GUARDED_BY(mu) = false;
 	std::exception_ptr eptr DUCKDB_GUARDED_BY(mu);
@@ -31,63 +31,50 @@ struct HedgedOutcomeToken<void> {
 
 template <typename T>
 T WaitForHedgedOutcome(shared_ptr<HedgedOutcomeToken<T>> token) {
-	concurrency::unique_lock<concurrency::mutex> lock(token->mu);
+	annotated_unique_lock<annotated_mutex> lock(token->mu);
 	token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
 	if (token->eptr != nullptr) {
 		std::rethrow_exception(token->eptr);
 	}
-	return std::move(*token->value);
-}
-
-inline void WaitForHedgedOutcome(shared_ptr<HedgedOutcomeToken<void>> token) {
-	concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-	token->cv.wait(lock, [token]() DUCKDB_REQUIRES(token->mu) { return token->completed; });
-	if (token->eptr != nullptr) {
-		std::rethrow_exception(token->eptr);
+	if constexpr (!std::is_void_v<T>) {
+		return std::move(*token->value);
 	}
 }
 
 template <typename T>
 void RunHedgedJob(std::function<T()> fn, shared_ptr<HedgedOutcomeToken<T>> token) {
 	try {
-		T r = fn();
-		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			ALWAYS_ASSERT(!token->completed);
-			token->value = make_uniq<T>(std::move(r));
+		if constexpr (std::is_void_v<T>) {
+			fn();
+			annotated_unique_lock<annotated_mutex> lock(token->mu);
+			if (token->completed) {
+				return;
+			}
+			token->completed = true;
+			token->cv.notify_all();
+		} else {
+			auto result = fn();
+			annotated_unique_lock<annotated_mutex> lock(token->mu);
+			if (token->completed) {
+				return;
+			}
+			token->value = make_uniq<T>(std::move(result));
 			token->completed = true;
 			token->cv.notify_all();
 		}
 	} catch (...) {
-		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			ALWAYS_ASSERT(!token->completed);
-			token->eptr = std::current_exception();
-			token->completed = true;
-			token->cv.notify_all();
+		annotated_unique_lock<annotated_mutex> lock(token->mu);
+		if (token->completed) {
+			return;
 		}
+		token->eptr = std::current_exception();
+		token->completed = true;
+		token->cv.notify_all();
 	}
 }
 
 inline void RunHedgedVoidJob(std::function<void()> fn, shared_ptr<HedgedOutcomeToken<void>> token) {
-	try {
-		fn();
-		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			if (!token->completed) {
-				token->completed = true;
-			}
-			token->cv.notify_all();
-		}
-	} catch (...) {
-		{
-			concurrency::unique_lock<concurrency::mutex> lock(token->mu);
-			ALWAYS_ASSERT(!token->completed);
-			token->eptr = std::current_exception();
-			token->completed = true;
-			token->cv.notify_all();
-		}
-	}
+	RunHedgedJob(std::move(fn), std::move(token));
 }
 
 } // namespace duckdb
