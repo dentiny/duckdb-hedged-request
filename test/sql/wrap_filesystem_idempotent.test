@@ -1,0 +1,46 @@
+# name: test/sql/wrap_filesystem_idempotent.test
+# description: filesystem wrapping is volatile and safe to repeat.
+# group: [sql]
+
+require hedged_request_fs
+
+query TI
+SELECT stability, has_side_effects FROM duckdb_functions()
+WHERE function_name = 'hedged_fs_wrap';
+----
+VOLATILE	true
+
+# Planning must not mutate the filesystem registry.
+statement ok
+PREPARE wrap_filesystem AS SELECT hedged_fs_wrap('MockFileSystem');
+
+query I
+SELECT COUNT(*) FROM hedged_fs_list_filesystems() WHERE name = 'MockFileSystem';
+----
+1
+
+query I
+EXECUTE wrap_filesystem;
+----
+true
+
+# Re-executing the same statement must reuse the existing wrapper.
+query I
+EXECUTE wrap_filesystem;
+----
+true
+
+query I
+SELECT hedged_fs_wrap('MockFileSystem');
+----
+true
+
+query I
+SELECT COUNT(*) FROM hedged_fs_list_filesystems() WHERE name = 'HedgedFileSystem - MockFileSystem';
+----
+1
+
+statement error
+SELECT hedged_fs_wrap('unregistered_filesystem');
+----
+Filesystem 'unregistered_filesystem' not found

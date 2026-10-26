@@ -89,6 +89,12 @@ void HedgedFsWrapFunction(DataChunk &args, ExpressionState &state, Vector &resul
 		string fs_str = fs_name.GetString();
 		auto extracted_fs = vfs.ExtractSubSystem(fs_str);
 		if (!extracted_fs) {
+			// Keep an existing wrapper when the original filesystem was already extracted.
+			const auto wrapped_name = StringUtil::Format("HedgedFileSystem - %s", fs_str);
+			const auto registered = vfs.ListSubSystems();
+			if (std::find(registered.begin(), registered.end(), wrapped_name) != registered.end()) {
+				return true;
+			}
 			throw InvalidInputException(
 			    "Filesystem '%s' not found. Use hedged_fs_list_filesystems() to see available filesystems.", fs_str);
 		}
@@ -130,6 +136,8 @@ TableFunction GetHedgedFsListFilesystemsFunction() {
 ScalarFunction GetHedgedFsWrapFunction() {
 	ScalarFunction function("hedged_fs_wrap", {/*filesystem_name=*/LogicalType {LogicalTypeId::VARCHAR}},
 	                        /*return_type=*/LogicalType {LogicalTypeId::BOOLEAN}, HedgedFsWrapFunction);
+	// Wrapping changes the filesystem registry and must not run during constant folding.
+	function.SetVolatile();
 	function.SetFallible();
 	function.GetSignature().GetParameter(0).SetName("filesystem_name");
 	return function;
