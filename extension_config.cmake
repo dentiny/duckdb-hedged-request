@@ -3,7 +3,7 @@
 
 # Extension from this repo
 duckdb_extension_load(hedged_request_fs SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}
-                      EXTENSION_VERSION 0.3.0 LOAD_TESTS)
+                      EXTENSION_VERSION 0.3.1 LOAD_TESTS)
 
 duckdb_extension_statically_link(hedged_request_fs)
 
